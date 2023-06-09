@@ -76,8 +76,13 @@ const downloadImage = async ({
       baseDirectory = path.join(
         __dirname,
         "..",
+        "..",
+        "..",
+        "..",
+        "var",
         "www",
-        "Documents",
+        "html",
+        "images",
         contractAddress
       );
     }
