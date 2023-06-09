@@ -1,0 +1,106 @@
+name: App install and start
+
+concurrency:
+  group: production
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: [self-hosted]
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          clean: false
+          submodules: "recursive"
+
+      - name: Use Node.js 16.x
+        uses: actions/setup-node@v1
+        with:
+          node-version: 16.x
+
+      - name: Install dependencies
+        working-directory: src
+        run: npm install
+
+      - name: Install jq
+        run: |
+          wget -O jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+          chmod +x ./jq
+          mkdir -p ~/bin
+          mv jq ~/bin/
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Stop old server (ignore error)
+        run: |
+          process_name="nft_image_generator"
+          process_list=$(npx pm2 jlist)
+          process_exists=$(echo $process_list | jq ".[] | select(.name==\"$process_name\")")
+          if [ -n "$process_exists" ]; then
+            npx pm2 delete $process_name
+          else
+            echo "'$process_name' process not found, skipping deletion."
+          fi
+
+      - name: Remove old server in ~/nft_image_generator (ignore error)
+        run: |
+          rm -rf ~/nft_image_generator || true
+
+      - name: Copy new server to ~/nft_image_generator
+        run: |
+          mkdir -p ~/nft_image_generator
+          cp -R ./ ~/nft_image_generator
+
+      - name: create env file
+        run: |
+          cd ~/nft_image_generator
+          touch .env
+          echo SECRET=${{ secrets.SECRET }} >> .env
+          echo AWS_ACCESS_ID=${{ secrets.AWS_ACCESS_ID }} >> .env
+          echo AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }} >> .env
+          echo OPERATOR_ID=${{ secrets.OPERATOR_ID }} >> .env
+          echo HOST=${{ secrets.HOST }} >> .env
+          echo MYSQL_PORT=${{ secrets.MYSQL_PORT }} >> .env
+          echo USERNAME=${{ secrets.USERNAME }} >> .env
+          echo PASSWORD=${{ secrets.PASSWORD }} >> .env
+          echo DATABASE=${{ secrets.DATABASE }} >> .env
+          echo ALIGO_API_KEY=${{ secrets.ALIGO_API_KEY }} >> .env
+          echo ALCHEMY_API_KEY=${{ secrets.ALCHEMY_API_KEY }} >> .env
+          echo OPENSEA_API_KEY=${{ secrets.OPENSEA_API_KEY }} >> .env
+          echo OPENSEA_API_KEY_2=${{ secrets.OPENSEA_API_KEY_2 }} >> .env
+          echo KAKAO_CLIENT_ID=${{ secrets.KAKAO_CLIENT_ID }} >> .env
+          echo PROXY_URL=${{ secrets.PROXY_URL }} >> .env
+          echo OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} >> .env
+
+      - name: Run new server (in background)
+        env:
+          RUNNER_TRACKING_ID: ""
+          SECRET: ${{ secrets.SECRET }}
+          AWS_ACCESS_ID: ${{ secrets.AWS_ACCESS_ID }}
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          OPERATOR_ID: ${{ secrets.OPERATOR_ID }}
+          HOST: ${{ secrets.HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
+          USERNAME: ${{ secrets.USERNAME }}
+          PASSWORD: ${{ secrets.PASSWORD }}
+          DATABASE: ${{ secrets.DATABASE }}
+          ALIGO_API_KEY: ${{ secrets.ALIGO_API_KEY }}
+          ALCHEMY_API_KEY: ${{ secrets.ALCHEMY_API_KEY }}
+          OPENSEA_API_KEY: ${{ secrets.OPENSEA_API_KEY }}
+          OPENSEA_API_KEY_2: ${{ secrets.OPENSEA_API_KEY_2 }}
+          KAKAO_CLIENT_ID: ${{ secrets.KAKAO_CLIENT_ID }}
+          PROXY_URL: ${{ secrets.PROXY_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+        run: |
+          cd ~/nft_image_generator
+          npx pm2 install typescript
+          npm run start &
+
+# 참고자료
+# https://velog.io/@ron/Github-Action-%EC%9C%BC%EB%A1%9C-%EB%AC%BC%EB%A6%AC%EC%84%9C%EB%B2%84%EC%97%90-%EC%9E%90%EB%8F%99%EB%B0%B0%ED%8F%AC%ED%95%98%EA%B8%B0
+

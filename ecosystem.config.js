@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "block_number_distributor",
+      name: "nft_image_generator",
       script: "build/index.js",
       watch: false,
       autorestart: false,
