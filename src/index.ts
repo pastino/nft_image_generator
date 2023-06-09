@@ -137,7 +137,7 @@ const downloadImage = async ({
     }
     console.log("파일을 다운로드하고 저장했습니다.");
   } catch (error) {
-    null;
+    console.log(error);
   }
 };
 
