@@ -72,14 +72,8 @@ const downloadImage = async ({
     // 디렉토리가 없으면 생성합니다.
     let baseDirectory = __dirname;
     if (IS_PRODUCTION) {
-      // 프로덕션 환경인 경우, 상위 디렉토리의 www 폴더를 기본 디렉토리로 사용합니다.
-      baseDirectory = path.join(
-        __dirname,
-        "..",
-        "www",
-        "Documents",
-        contractAddress
-      );
+      // 프로덕션 환경인 경우, /var/www/html/images 폴더를 기본 디렉토리로 사용합니다.
+      baseDirectory = "/var/www/html/images";
     }
 
     const originPath = path.join(baseDirectory, "origin");
@@ -146,6 +140,6 @@ app.post("/image", async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT as number, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Listening on port: "http://localhost:${PORT}"`);
 });
