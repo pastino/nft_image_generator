@@ -85,11 +85,6 @@ const downloadImage = async ({
       );
     }
 
-    // if (IS_PRODUCTION) {
-    //   // 프로덕션 환경인 경우, /var/www/html/images 폴더를 기본 디렉토리로 사용합니다.
-    //   baseDirectory = "/var/www/html/images";
-    // }
-
     const originPath = path.join(baseDirectory, "origin");
     if (!fs.existsSync(originPath)) {
       fs.mkdirSync(originPath, { recursive: true });
@@ -98,9 +93,9 @@ const downloadImage = async ({
     // 파일명을 생성합니다.
     const hashedFileName = encrypt(tokenId) + `.${format}`;
 
-    // 원본 파일을 저장합니다.
-    const originalFilePath = path.join(originPath, hashedFileName);
-    fs.writeFileSync(originalFilePath, response.data);
+    // // 원본 파일을 저장합니다.
+    // const originalFilePath = path.join(originPath, hashedFileName);
+    // fs.writeFileSync(originalFilePath, response.data);
 
     // 이미지인 경우 썸네일을 생성합니다.
     if (format !== "mp4") {
@@ -125,10 +120,31 @@ const downloadImage = async ({
 
       // FFMpeg를 사용하여 동영상을 압축합니다.
       await new Promise((resolve, reject) => {
-        ffmpeg(originalFilePath)
+        ffmpeg(compressedFilePath)
           .outputOptions(["-c:v libx264", "-crf 28", "-preset veryfast"])
           .output(compressedFilePath)
-          .on("end", resolve)
+          .on("end", async () => {
+            // 썸네일 생성
+            const thumbnailPath = path.join(baseDirectory, "thumbnail");
+            if (!fs.existsSync(thumbnailPath)) {
+              fs.mkdirSync(thumbnailPath, { recursive: true });
+            }
+
+            // 썸네일 파일명을 생성합니다.
+            const thumbnailFileName = encrypt(tokenId) + ".png";
+
+            // 동영상 파일을 읽고 썸네일로 변환합니다.
+            const thumbnailFilePath = path.join(
+              thumbnailPath,
+              thumbnailFileName
+            );
+            const thumbnailTransformer = sharp(compressedFilePath).resize(200); // 원하는 크기로 조정할 수 있습니다.
+            await thumbnailTransformer
+              .toFormat("png")
+              .toFile(thumbnailFilePath);
+
+            resolve(undefined);
+          })
           .on("error", reject)
           .run();
       });
@@ -143,7 +159,6 @@ app.post("/image", async (req: Request, res: Response) => {
   const {
     body: { imageUrl, contractAddress, tokenId, format },
   }: any = req;
-  console.log(imageUrl, contractAddress, tokenId, format);
   try {
     // 이미지 생성
     await downloadImage({ imageUrl, contractAddress, tokenId, format });
