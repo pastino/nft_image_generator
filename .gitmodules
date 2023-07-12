@@ -1,0 +1,3 @@
+[submodule "src/shared"]
+	path = src/shared
+	url = https://github.com/pastino/blockchain_common_modules

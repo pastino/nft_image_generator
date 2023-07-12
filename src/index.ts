@@ -8,6 +8,8 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
+import { getRepository } from "typeorm";
+import { NFT } from "./shared/entities/NFT";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -45,11 +47,13 @@ const decrypt = (encrypted: string) => {
 };
 
 const downloadImage = async ({
+  nftId,
   imageUrl,
   contractAddress,
   tokenId,
   format,
 }: {
+  nftId: number;
   imageUrl?: string;
   contractAddress: string;
   tokenId?: string | number;
@@ -149,19 +153,39 @@ const downloadImage = async ({
           .run();
       });
     }
+
+    // Get the NFT repository
+    const nftRepository = getRepository(NFT);
+
+    // Find the NFT by its ID
+    const nft = await nftRepository.findOne(nftId);
+
+    if (nft) {
+      // Update the NFT with the new image route and mark it as uploaded
+      nft.imageRoute = "/" + hashedFileName;
+      nft.isImageUploaded = true;
+
+      // Update the updated NFT
+      await nftRepository.update({ id: nftId }, nft);
+    }
     console.log("파일을 다운로드하고 저장했습니다.");
   } catch (error) {
+    const nftRepository = getRepository(NFT);
+    // Find the NFT by its ID
+    const nft = await nftRepository.findOne(nftId);
+    if (nft)
+      await nftRepository.update({ id: nftId }, { isImageUploaded: false });
     console.log(error);
   }
 };
 
 app.post("/image", async (req: Request, res: Response) => {
   const {
-    body: { imageUrl, contractAddress, tokenId, format },
+    body: { nftId, imageUrl, contractAddress, tokenId, format },
   }: any = req;
   try {
     // 이미지 생성
-    await downloadImage({ imageUrl, contractAddress, tokenId, format });
+    await downloadImage({ nftId, imageUrl, contractAddress, tokenId, format });
     return res.status(200).json(true);
   } catch (e: any) {
     console.log(e);

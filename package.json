@@ -35,6 +35,7 @@
     "express": "^4.18.2",
     "fluent-ffmpeg": "^2.1.2",
     "morgan": "^1.10.0",
-    "sharp": "^0.32.1"
+    "sharp": "^0.32.1",
+    "typeorm": "0.2.34"
   }
 }
