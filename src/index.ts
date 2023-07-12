@@ -67,13 +67,15 @@ const downloadImage = async ({
   }
   const nftRepository = getRepository(NFT);
   // Find the NFT by its ID
-  const nft = await nftRepository.findOne(nftId);
+  const nft = await nftRepository.findOne({
+    where: { id: nftId },
+  });
 
   if (!nft || !imageUrl || !tokenId || !contractAddress) {
-    if (nft) console.log("nft가 없습니다.");
-    if (imageUrl) console.log("imageUrl가 없습니다.");
-    if (tokenId) console.log("tokenId가 없습니다.");
-    if (contractAddress) console.log("contractAddress가 없습니다.");
+    if (!nft) console.log("nft가 없습니다.");
+    if (!imageUrl) console.log("imageUrl가 없습니다.");
+    if (!tokenId) console.log("tokenId가 없습니다.");
+    if (!contractAddress) console.log("contractAddress가 없습니다.");
     return;
   }
   if (!format) format = "png";
