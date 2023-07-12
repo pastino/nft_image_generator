@@ -75,6 +75,7 @@ const downloadImage = async ({
     if (!imageUrl) console.log("imageUrl가 없습니다.");
     if (!tokenId) console.log("tokenId가 없습니다.");
     if (!contractAddress) console.log("contractAddress가 없습니다.");
+    await nftRepository.update({ id: nftId }, { isImageUploaded: false });
     return;
   }
   if (!format) format = "png";
@@ -182,9 +183,6 @@ const downloadImage = async ({
     }
     console.log("파일을 다운로드하고 저장했습니다.");
   } catch (error) {
-    const nftRepository = getRepository(NFT);
-    // Find the NFT by its ID
-    const nft = await nftRepository.findOne(nftId);
     if (nft)
       await nftRepository.update({ id: nftId }, { isImageUploaded: false });
     console.log(error);
