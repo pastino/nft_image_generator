@@ -8,8 +8,9 @@ import fs from "fs";
 import path from "path";
 import sharp from "sharp";
 import ffmpeg from "fluent-ffmpeg";
-import { getRepository } from "typeorm";
+import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
+import connectionOptions from "./shared/ormconfig";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -193,6 +194,13 @@ app.post("/image", async (req: Request, res: Response) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Listening on port: "http://localhost:${PORT}"`);
-});
+createConnection(connectionOptions)
+  .then(() => {
+    console.log("DB CONNECTION!");
+    app.listen(PORT, async () => {
+      console.log(`Listening on port: "http://localhost:${PORT}"`);
+    });
+  })
+  .catch((error) => {
+    console.log(error);
+  });
