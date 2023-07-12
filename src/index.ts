@@ -60,7 +60,6 @@ const downloadImage = async ({
   tokenId?: string | number;
   format?: string;
 }) => {
-  console.log(nftId, imageUrl, contractAddress, tokenId, format);
   if (!nftId) {
     console.log("nftId가 없습니다.");
     return;
