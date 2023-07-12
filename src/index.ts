@@ -69,9 +69,10 @@ const downloadImage = async ({
   const nft = await nftRepository.findOne(nftId);
 
   if (!nft || !imageUrl || !tokenId || !contractAddress) {
-    console.log(
-      "nft 또는 imageUrl 또는 tokenId 또는 contractAddress가 없습니다."
-    );
+    if (nft) console.log("nft가 없습니다.");
+    if (imageUrl) console.log("imageUrl가 없습니다.");
+    if (tokenId) console.log("tokenId가 없습니다.");
+    if (contractAddress) console.log("contractAddress가 없습니다.");
     return;
   }
   if (!format) format = "png";
