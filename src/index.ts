@@ -60,7 +60,20 @@ const downloadImage = async ({
   tokenId?: string | number;
   format?: string;
 }) => {
-  if (!imageUrl || !tokenId || !contractAddress) return;
+  if (!nftId) {
+    console.log("nftId가 없습니다.");
+    return;
+  }
+  const nftRepository = getRepository(NFT);
+  // Find the NFT by its ID
+  const nft = await nftRepository.findOne(nftId);
+
+  if (!nft || !imageUrl || !tokenId || !contractAddress) {
+    console.log(
+      "nft 또는 imageUrl 또는 tokenId 또는 contractAddress가 없습니다."
+    );
+    return;
+  }
   if (!format) format = "png";
   try {
     // IPFS URL이면 HTTP URL로 변환합니다.
@@ -72,6 +85,7 @@ const downloadImage = async ({
     // 파일을 다운로드합니다.
     const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
+      maxContentLength: 500 * 1024 * 1024, // 200MB
     });
 
     // 디렉토리가 없으면 생성합니다.
@@ -154,12 +168,6 @@ const downloadImage = async ({
           .run();
       });
     }
-
-    // Get the NFT repository
-    const nftRepository = getRepository(NFT);
-
-    // Find the NFT by its ID
-    const nft = await nftRepository.findOne(nftId);
 
     if (nft) {
       // Update the NFT with the new image route and mark it as uploaded
