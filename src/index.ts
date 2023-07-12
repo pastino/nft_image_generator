@@ -11,6 +11,7 @@ import ffmpeg from "fluent-ffmpeg";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
+import { Readable } from "stream";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -89,7 +90,7 @@ const downloadImage = async ({
     // 파일을 다운로드합니다.
     const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
-      maxContentLength: 500 * 1024 * 1024, // 200MB
+      maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
     });
 
     // 디렉토리가 없으면 생성합니다.
@@ -139,11 +140,14 @@ const downloadImage = async ({
         fs.mkdirSync(compressedPath, { recursive: true });
       }
 
-      const compressedFilePath = path.join(compressedPath, hashedFileName);
+      const compressedFileName = encrypt(tokenId) + `.${format}`;
+      const compressedFilePath = path.join(compressedPath, compressedFileName);
 
       // FFMpeg를 사용하여 동영상을 압축합니다.
+      const readable = Readable.from(Buffer.from(response.data));
+
       await new Promise((resolve, reject) => {
-        ffmpeg(compressedFilePath)
+        ffmpeg(readable)
           .outputOptions(["-c:v libx264", "-crf 28", "-preset veryfast"])
           .output(compressedFilePath)
           .on("end", async () => {
