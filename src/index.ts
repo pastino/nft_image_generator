@@ -10,10 +10,8 @@ import sharp from "sharp";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
-import { Readable } from "stream";
 import ffmpeg from "fluent-ffmpeg";
-// const ffmpeg = require("fluent-ffmpeg");
-// ffmpeg.setFfmpegPath("/usr/local/bin/ffmpeg");
+import Bottleneck from "bottleneck";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -48,6 +46,29 @@ const decrypt = (encrypted: string) => {
   let decrypted = decipher.update(encrypted, "hex", "utf8");
   decrypted += decipher.final("utf8");
   return decrypted;
+};
+
+// 서버 주소를 키로 하고, 해당 서버의 Bottleneck 인스턴스를 값으로 하는 Map을 생성합니다.
+const limiters = new Map<string, Bottleneck>();
+
+const getLimiterForServer = (server: string) => {
+  if (!limiters.has(server)) {
+    const limiter = new Bottleneck({
+      minTime: 200,
+    });
+    limiter.on("failed", async (error: any, jobInfo: any) => {
+      const jobError = jobInfo.error;
+      if (jobError && jobError.response && jobError.response.status === 429) {
+        console.log(
+          `429 에러가 발생했습니다. 재시도 전에 1분 동안 대기합니다. 서버: ${server}`
+        );
+        limiter.updateSettings({ minTime: 1000 }); // 한 작업당 최소 대기 시간을 1초로 증가시킵니다.
+        return 60 * 1000; // 1분 후에 작업을 재시도합니다.
+      }
+    });
+    limiters.set(server, limiter);
+  }
+  return limiters.get(server)!;
 };
 
 const downloadImage = async ({
@@ -91,17 +112,49 @@ const downloadImage = async ({
     }
     // 아니면, 파일을 다운로드합니다.
     else {
+      if (!imageUrl) {
+        if (nft) {
+          await nftRepository.update(
+            { id: nftId },
+            {
+              isImageUploaded: false,
+              imageSaveError: "imageUrl이 제공되지 않았습니다.",
+            }
+          );
+        }
+        return;
+      }
+
       // IPFS URL이면 HTTP URL로 변환합니다.
+      let server = "";
+
       if (imageUrl.startsWith("ipfs://")) {
         const ipfsHash = imageUrl.split("ipfs://")[1];
         imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
+      } else {
+        // 서버 주소를 구합니다.
+        server = imageUrl.split("/")[2]; // "http://example.com/path"에서 "example.com"을 추출
       }
-      // 파일을 다운로드합니다.
-      const response = await axios.get(imageUrl, {
-        responseType: "arraybuffer",
-        maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
-      });
-      imageData = response.data;
+
+      // "ipfs.io"가 아닌 경우에만 제한을 적용합니다.
+      if (server !== "ipfs.io") {
+        const limiter = getLimiterForServer(server);
+        // 파일을 다운로드합니다.
+        const response = await limiter.schedule(
+          async () =>
+            await axios.get(imageUrl as string, {
+              responseType: "arraybuffer",
+              maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
+            })
+        );
+        imageData = response.data;
+      } else {
+        const response = await axios.get(imageUrl, {
+          responseType: "arraybuffer",
+          maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
+        });
+        imageData = response.data;
+      }
     }
 
     // 디렉토리가 없으면 생성합니다.
