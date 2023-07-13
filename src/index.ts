@@ -7,11 +7,13 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
-import ffmpeg from "fluent-ffmpeg";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import { Readable } from "stream";
+import ffmpeg from "fluent-ffmpeg";
+// const ffmpeg = require("fluent-ffmpeg");
+// ffmpeg.setFfmpegPath("/usr/local/bin/ffmpeg");
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -61,10 +63,6 @@ const downloadImage = async ({
   tokenId?: string | number;
   format?: string;
 }) => {
-  if (!nftId) {
-    console.log("nftId가 없습니다.");
-    return;
-  }
   const nftRepository = getRepository(NFT);
   // Find the NFT by its ID
   const nft = await nftRepository.findOne({
@@ -72,26 +70,39 @@ const downloadImage = async ({
   });
 
   if (!nft || !imageUrl || !tokenId || !contractAddress) {
-    if (!nft) console.log("nft가 없습니다.");
-    if (!imageUrl) console.log("imageUrl가 없습니다.");
-    if (!tokenId) console.log("tokenId가 없습니다.");
-    if (!contractAddress) console.log("contractAddress가 없습니다.");
-    await nftRepository.update({ id: nftId }, { isImageUploaded: false });
+    let failedMessage = "";
+    if (!nft) failedMessage = "nft가 없습니다.";
+    if (!imageUrl) failedMessage = "imageUrl가 없습니다.";
+    if (!tokenId) failedMessage = "tokenId가 없습니다.";
+    if (!contractAddress) failedMessage = "contractAddress가 없습니다.";
+    await nftRepository.update(
+      { id: nftId },
+      { isImageUploaded: false, imageSaveError: failedMessage }
+    );
     return;
   }
-  if (!format) format = "png";
-  try {
-    // IPFS URL이면 HTTP URL로 변환합니다.
-    if (imageUrl.startsWith("ipfs://")) {
-      const ipfsHash = imageUrl.split("ipfs://")[1];
-      imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
-    }
 
-    // 파일을 다운로드합니다.
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
-    });
+  try {
+    let imageData;
+    // Base64-encoded URL이면, 데이터를 디코딩합니다.
+    if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
+      const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
+      imageData = Buffer.from(base64Data, "base64");
+    }
+    // 아니면, 파일을 다운로드합니다.
+    else {
+      // IPFS URL이면 HTTP URL로 변환합니다.
+      if (imageUrl.startsWith("ipfs://")) {
+        const ipfsHash = imageUrl.split("ipfs://")[1];
+        imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
+      }
+      // 파일을 다운로드합니다.
+      const response = await axios.get(imageUrl, {
+        responseType: "arraybuffer",
+        maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
+      });
+      imageData = response.data;
+    }
 
     // 디렉토리가 없으면 생성합니다.
     let baseDirectory = __dirname;
@@ -109,87 +120,63 @@ const downloadImage = async ({
       );
     }
 
-    const originPath = path.join(baseDirectory, "origin");
-    if (!fs.existsSync(originPath)) {
-      fs.mkdirSync(originPath, { recursive: true });
-    }
-
     // 파일명을 생성합니다.
-    const hashedFileName = encrypt(tokenId) + `.${format}`;
+    const hashedFileName = encrypt(tokenId) + `.png`;
+    const thumbnailPath = path.join(baseDirectory, "thumbnail");
 
-    // // 원본 파일을 저장합니다.
-    // const originalFilePath = path.join(originPath, hashedFileName);
-    // fs.writeFileSync(originalFilePath, response.data);
+    // 동영상인 경우 첫 프레임을 캡쳐합니다.
+    if (format === "mp4") {
+      const originPath = path.join(baseDirectory, "origin");
+      if (!fs.existsSync(originPath)) {
+        fs.mkdirSync(originPath, { recursive: true });
+      }
 
-    // 이미지인 경우 썸네일을 생성합니다.
-    if (format !== "mp4") {
-      const thumbnailPath = path.join(baseDirectory, "thumbnail");
+      // 데이터를 임시 파일로 저장합니다.
+      const tempFilePath = path.join(originPath, `${encrypt(tokenId)}.mp4`);
+      fs.writeFileSync(tempFilePath, imageData);
+
+      // 첫 프레임을 캡쳐합니다.
+      await new Promise((resolve, reject) => {
+        // 썸네일 디렉토리가 없으면 생성합니다.
+        if (!fs.existsSync(thumbnailPath)) {
+          fs.mkdirSync(thumbnailPath, { recursive: true });
+        }
+        ffmpeg(tempFilePath)
+          .outputOptions("-vframes 1")
+          .outputOptions("-f image2pipe")
+          .outputOptions("-vcodec png")
+          .saveToFile(path.join(thumbnailPath, hashedFileName))
+          .on("end", async () => {
+            // 임시 파일을 삭제합니다.
+            fs.unlinkSync(tempFilePath);
+            resolve(undefined);
+          })
+          .on("error", reject);
+      });
+    } else {
+      // 디렉토리가 없으면 생성합니다.
       if (!fs.existsSync(thumbnailPath)) {
         fs.mkdirSync(thumbnailPath, { recursive: true });
       }
-
-      // 썸네일을 저장합니다.
-      const thumbnailFilePath = path.join(thumbnailPath, hashedFileName);
-      const transformer = sharp(response.data).resize(200); // 원하는 크기로 조정할 수 있습니다.
-      await transformer.toFile(thumbnailFilePath);
-    }
-    // 동영상인 경우 압축합니다.
-    else {
-      const compressedPath = path.join(baseDirectory, "compressed");
-      if (!fs.existsSync(compressedPath)) {
-        fs.mkdirSync(compressedPath, { recursive: true });
-      }
-
-      const compressedFileName = encrypt(tokenId) + `.${format}`;
-      const compressedFilePath = path.join(compressedPath, compressedFileName);
-
-      // FFMpeg를 사용하여 동영상을 압축합니다.
-      const readable = Readable.from(Buffer.from(response.data));
-
-      await new Promise((resolve, reject) => {
-        ffmpeg(readable)
-          .outputOptions(["-c:v libx264", "-crf 28", "-preset veryfast"])
-          .output(compressedFilePath)
-          .on("end", async () => {
-            // 썸네일 생성
-            const thumbnailPath = path.join(baseDirectory, "thumbnail");
-            if (!fs.existsSync(thumbnailPath)) {
-              fs.mkdirSync(thumbnailPath, { recursive: true });
-            }
-
-            // 썸네일 파일명을 생성합니다.
-            const thumbnailFileName = encrypt(tokenId) + ".png";
-
-            // 동영상 파일을 읽고 썸네일로 변환합니다.
-            const thumbnailFilePath = path.join(
-              thumbnailPath,
-              thumbnailFileName
-            );
-            const thumbnailTransformer = sharp(compressedFilePath).resize(200); // 원하는 크기로 조정할 수 있습니다.
-            await thumbnailTransformer
-              .toFormat("png")
-              .toFile(thumbnailFilePath);
-
-            resolve(undefined);
-          })
-          .on("error", reject)
-          .run();
-      });
+      // 이미지 파일을 PNG로 변환하고 저장합니다.
+      const transformer = sharp(imageData).resize(200).toFormat("png");
+      await transformer.toFile(path.join(thumbnailPath, hashedFileName));
     }
 
     if (nft) {
       // Update the NFT with the new image route and mark it as uploaded
       nft.imageRoute = "/" + hashedFileName;
       nft.isImageUploaded = true;
-
       // Update the updated NFT
       await nftRepository.update({ id: nftId }, nft);
     }
     console.log("파일을 다운로드하고 저장했습니다.");
-  } catch (error) {
+  } catch (error: any) {
     if (nft)
-      await nftRepository.update({ id: nftId }, { isImageUploaded: false });
-    console.log(error);
+      await nftRepository.update(
+        { id: nftId },
+        { isImageUploaded: false, imageSaveError: error.message }
+      );
   }
 };
 
@@ -202,7 +189,7 @@ app.post("/image", async (req: Request, res: Response) => {
     await downloadImage({ nftId, imageUrl, contractAddress, tokenId, format });
     return res.status(200).json(true);
   } catch (e: any) {
-    console.log(e);
+    console.log(e.message);
     return res.status(400).json(false);
   }
 });
