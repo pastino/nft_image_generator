@@ -12,6 +12,7 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
+import { fileTypeFromFile } from "file-type";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -176,6 +177,24 @@ const downloadImage = async ({
     // 파일명을 생성합니다.
     const hashedFileName = encrypt(tokenId) + `.png`;
     const thumbnailPath = path.join(baseDirectory, "thumbnail");
+
+    if (!format && imageUrl) {
+      const ext = path.extname(imageUrl).toLowerCase(); // 확장자 추출
+      format = ext.replace(".", ""); // 점 제거
+    }
+
+    if (!format) {
+      fileTypeFromFile(imageData).then((fileType) => {
+        if (fileType) {
+          format = fileType.ext;
+        }
+      });
+    }
+
+    // If format could not be determined, assume it is png
+    if (!format) {
+      format = "png";
+    }
 
     // 동영상인 경우 첫 프레임을 캡쳐합니다.
     if (format === "mp4") {
