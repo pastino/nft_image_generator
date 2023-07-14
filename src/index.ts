@@ -12,12 +12,6 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
-// /**
-//  * Import 'file-type' ES-Module in CommonJS Node.js module
-//  */
-// const { fileTypeFromFile } = await (eval('import("file-type")') as Promise<
-//   typeof import("file-type")
-// >);
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -131,19 +125,24 @@ const downloadImage = async ({
         return;
       }
 
-      // IPFS URL이면 HTTP URL로 변환합니다.
+      // IPFS, AR URL이면 HTTP URL로 변환합니다.
       let server = "";
-
+      // URL 변환 로직을 확장합니다.
       if (imageUrl.startsWith("ipfs://")) {
         const ipfsHash = imageUrl.split("ipfs://")[1];
         imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
+        server = "ipfs.io";
+      } else if (imageUrl.startsWith("ar://")) {
+        const arweaveHash = imageUrl.split("ar://")[1];
+        imageUrl = `https://arweave.net/${arweaveHash}`;
+        server = "arweave.net";
       } else {
         // 서버 주소를 구합니다.
         server = imageUrl.split("/")[2]; // "http://example.com/path"에서 "example.com"을 추출
       }
 
       // "ipfs.io"가 아닌 경우에만 제한을 적용합니다.
-      if (server !== "ipfs.io") {
+      if (server !== "ipfs.io" && server !== "arweave.net") {
         const limiter = getLimiterForServer(server);
         // 파일을 다운로드합니다.
         const response = await limiter.schedule(
