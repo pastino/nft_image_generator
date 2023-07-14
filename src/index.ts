@@ -197,7 +197,7 @@ const downloadImage = async ({
           'import("file-type")'
         ) as Promise<typeof import("file-type")>);
 
-        fileTypeFromFile(imageData).then((fileType) => {
+        await fileTypeFromFile(imageData).then((fileType) => {
           if (fileType) {
             format = fileType.ext;
           }
