@@ -12,7 +12,7 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
-import { fileTypeFromFile } from "file-type";
+import FileType from "file-type";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -184,7 +184,7 @@ const downloadImage = async ({
     }
 
     if (!format) {
-      fileTypeFromFile(imageData).then((fileType) => {
+      FileType.fileTypeFromFile(imageData).then((fileType) => {
         if (fileType) {
           format = fileType.ext;
         }
