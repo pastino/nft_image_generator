@@ -12,6 +12,7 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
+import { HttpsProxyAgent } from "https-proxy-agent";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -27,6 +28,29 @@ app.use(
     credentials: true,
   })
 );
+
+const proxyUrls = [
+  "http://3.36.128.152:3128",
+  "http://43.201.115.129:3128",
+  "http://13.125.246.212:3128",
+  "http://13.124.178.240:3128",
+  "http://13.125.146.26:3128",
+  "http://43.202.62.251:3128",
+  "", // 프록시 없음
+];
+
+let proxyIndex = 0;
+
+const getProxyAgent = () => {
+  const proxyUrl = proxyUrls[proxyIndex];
+  proxyIndex = (proxyIndex + 1) % proxyUrls.length; // 다음 프록시를 선택
+  if (proxyUrl === "") {
+    return undefined; // 프록시 없음
+  }
+  return new HttpsProxyAgent(proxyUrl);
+};
+
+const axiosInstance = axios.create();
 
 const encrypt = (tokenId: string | number) => {
   const cipher = crypto.createCipher(
@@ -54,17 +78,7 @@ const limiters = new Map<string, Bottleneck>();
 const getLimiterForServer = (server: string) => {
   if (!limiters.has(server)) {
     const limiter = new Bottleneck({
-      minTime: 200,
-    });
-    limiter.on("failed", async (error: any, jobInfo: any) => {
-      const jobError = jobInfo.error;
-      if (jobError && jobError.response && jobError.response.status === 429) {
-        console.log(
-          `429 에러가 발생했습니다. 재시도 전에 1분 동안 대기합니다. 서버: ${server}`
-        );
-        limiter.updateSettings({ minTime: 1000 }); // 한 작업당 최소 대기 시간을 1초로 증가시킵니다.
-        return 60 * 1000; // 1분 후에 작업을 재시도합니다.
-      }
+      minTime: 200, // 1초에 3개까지 요청
     });
     limiters.set(server, limiter);
   }
@@ -129,7 +143,11 @@ const downloadImage = async ({
       let server = "";
       // URL 변환 로직을 확장합니다.
       if (imageUrl.startsWith("ipfs://")) {
-        const ipfsHash = imageUrl.split("ipfs://")[1];
+        let ipfsHash = imageUrl.split("ipfs://")[1];
+        // ipfsHash가 "ipfs/"로 시작하면 추가로 "ipfs/"를 제거합니다.
+        if (ipfsHash.startsWith("ipfs/")) {
+          ipfsHash = ipfsHash.split("ipfs/")[1];
+        }
         imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
         server = "ipfs.io";
       } else if (imageUrl.startsWith("ar://")) {
@@ -141,24 +159,27 @@ const downloadImage = async ({
         server = imageUrl.split("/")[2]; // "http://example.com/path"에서 "example.com"을 추출
       }
 
-      // "ipfs.io"가 아닌 경우에만 제한을 적용합니다.
-      if (server !== "ipfs.io" && server !== "arweave.net") {
-        const limiter = getLimiterForServer(server);
-        // 파일을 다운로드합니다.
+      const limiter = getLimiterForServer(server);
+      try {
         const response = await limiter.schedule(
           async () =>
-            await axios.get(imageUrl as string, {
+            await axiosInstance.get(imageUrl as string, {
               responseType: "arraybuffer",
-              maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
+              maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
+              httpsAgent: getProxyAgent(), // 프록시 설정
             })
         );
         imageData = response.data;
-      } else {
-        const response = await axios.get(imageUrl, {
-          responseType: "arraybuffer",
-          maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
-        });
-        imageData = response.data;
+      } catch (error: any) {
+        // Handle the axios error here
+        // For example, retry the request if the status code is 429
+        if (error.response && error.response.status === 429) {
+          const retryAfter = error.response.headers["retry-after"];
+          console.log(
+            `429 error occurred. Retry after 1 minute. Server: ${server}, ${imageUrl}: retryAfter: ${retryAfter}`
+          );
+        }
+        throw error;
       }
     }
 
@@ -284,6 +305,30 @@ createConnection(connectionOptions)
     console.log("DB CONNECTION!");
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
+
+      // const errorDataList = await getRepository(NFT)
+      //   .createQueryBuilder("nft")
+      //   .where("nft.imageSaveError = :imageSaveError", {
+      //     imageSaveError: "Request failed with status code 429",
+      //   })
+      //   .leftJoinAndSelect("nft.contract", "contract")
+      //   .getMany();
+
+      // for (let i = 0; i < errorDataList.length; i++) {
+      //   const nft = errorDataList[i];
+      //   try {
+      //     downloadImage({
+      //       nftId: nft.id,
+      //       contractAddress: nft.contract.address,
+      //       format: nft.imageFormat,
+      //       imageUrl: nft.imageRaw,
+      //       tokenId: nft.tokenId,
+      //     });
+      //   } catch (e) {
+      //     null;
+      //   }
+      // }
+      // console.log("errorDataList", errorDataList?.length);
     });
   })
   .catch((error) => {
