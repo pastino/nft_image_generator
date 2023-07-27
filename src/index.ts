@@ -218,14 +218,37 @@ const downloadImage = async ({
       fs.mkdirSync(thumbnailPath, { recursive: true });
     }
 
-    if (["jpeg", "png", "webp", "tiff", "gif"].includes(format)) {
+    if (["jpeg", "png", "webp", "tiff"].includes(format)) {
       // For image formats that Sharp can handle, we resize and change format
       const transformer = sharp(imageData)
         .resize(200)
         .toFormat(format as any);
       await transformer.toFile(path.join(thumbnailPath, hashedFileName));
+    } else if (format === "gif") {
+      const tempFilePath = path.join(
+        thumbnailPath,
+        `${encrypt(tokenId)}_temp.gif`
+      );
+      fs.writeFileSync(tempFilePath, imageData);
+
+      const outputPath = path.join(thumbnailPath, hashedFileName);
+
+      await new Promise((resolve, reject) => {
+        ffmpeg(tempFilePath)
+          .outputOptions("-vf scale=200:-1") // Resize the GIF
+          .output(outputPath)
+          .on("end", () => {
+            fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
+            resolve(undefined);
+          })
+          .on("error", reject)
+          .run(); // Run the command
+      });
     } else if (format === "mp4") {
-      const tempFilePath = path.join(thumbnailPath, `${encrypt(tokenId)}.mp4`);
+      const tempFilePath = path.join(
+        thumbnailPath,
+        `${encrypt(tokenId)}_temp.mp4`
+      );
       fs.writeFileSync(tempFilePath, imageData);
 
       const outputPath = path.join(thumbnailPath, hashedFileName);
@@ -233,7 +256,7 @@ const downloadImage = async ({
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
           .outputOptions("-c:v libx264") // Set the video codec to libx264
-          .outputOptions("-crf 33") // Set the Constant Rate Factor (CRF) to 23. The lower the CRF, the higher the quality and larger the file size. You can adjust this value to suit your needs.
+          .outputOptions("-crf 33") // Set the Constant Rate Factor (CRF) to 33. The lower the CRF, the higher the quality and larger the file size. You can adjust this value to suit your needs.
           .outputOptions("-c:a aac") // Set the audio codec to aac
           .output(outputPath)
           .on("end", () => {
@@ -281,30 +304,6 @@ createConnection(connectionOptions)
     console.log("DB CONNECTION!");
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
-
-      // const errorDataList = await getRepository(NFT)
-      //   .createQueryBuilder("nft")
-      //   .where("nft.imageSaveError = :imageSaveError", {
-      //     imageSaveError: "Request failed with status code 429",
-      //   })
-      //   .leftJoinAndSelect("nft.contract", "contract")
-      //   .getMany();
-
-      // for (let i = 0; i < errorDataList.length; i++) {
-      //   const nft = errorDataList[i];
-      //   try {
-      //     downloadImage({
-      //       nftId: nft.id,
-      //       contractAddress: nft.contract.address,
-      //       format: nft.imageFormat,
-      //       imageUrl: nft.imageRaw,
-      //       tokenId: nft.tokenId,
-      //     });
-      //   } catch (e) {
-      //     null;
-      //   }
-      // }
-      // console.log("errorDataList", errorDataList?.length);
     });
   })
   .catch((error) => {
