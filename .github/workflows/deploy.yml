@@ -65,6 +65,7 @@ jobs:
           echo OPERATOR_ID=${{ secrets.OPERATOR_ID }} >> .env
           echo HOST=${{ secrets.HOST }} >> .env
           echo MYSQL_PORT=${{ secrets.MYSQL_PORT }} >> .env
+          echo POSTGRESQL_PORT=${{ secrets.POSTGRESQL_PORT }} >> .env
           echo USERNAME=${{ secrets.USERNAME }} >> .env
           echo PASSWORD=${{ secrets.PASSWORD }} >> .env
           echo DATABASE=${{ secrets.DATABASE }} >> .env
