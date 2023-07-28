@@ -247,17 +247,17 @@ const downloadImage = async ({
     } else if (format === "mp4") {
       const tempFilePath = path.join(
         thumbnailPath,
-        `${encrypt(tokenId)}_temp.mp4`
+        `${encrypt("12312")}_temp.mp4`
       );
       fs.writeFileSync(tempFilePath, imageData);
 
-      const outputPath = path.join(thumbnailPath, hashedFileName);
+      const outputPath = path.join(thumbnailPath, `${hashedFileName}.gif`);
 
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
-          .outputOptions("-c:v libx264") // Set the video codec to libx264
-          .outputOptions("-crf 33") // Set the Constant Rate Factor (CRF) to 33. The lower the CRF, the higher the quality and larger the file size. You can adjust this value to suit your needs.
-          .outputOptions("-c:a aac") // Set the audio codec to aac
+          .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
+          .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
+          .toFormat("gif")
           .output(outputPath)
           .on("end", () => {
             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
