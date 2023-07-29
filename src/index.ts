@@ -1,11 +1,11 @@
 import "./env";
 import express, { Request, Response } from "express";
 import cors from "cors";
-import morgan, { token } from "morgan";
+import morgan from "morgan";
 import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
-import path, { format } from "path";
+import path from "path";
 import sharp from "sharp";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
@@ -196,7 +196,8 @@ const downloadImage = async ({
       "tiff",
       "webp",
     ];
-    if (format && IMAGE_FORMAT_LIST?.includes(format)) {
+
+    if (format && !IMAGE_FORMAT_LIST?.includes(format)) {
       format = undefined;
     }
 
@@ -226,6 +227,8 @@ const downloadImage = async ({
     let hashedFileName;
     if (format === "svg+xml") {
       hashedFileName = encrypt(tokenId) + ".png";
+    } else if ("mp4") {
+      hashedFileName = encrypt(tokenId) + ".gif";
     } else {
       hashedFileName = encrypt(tokenId) + `.${format}`;
     }
@@ -276,7 +279,7 @@ const downloadImage = async ({
       );
       fs.writeFileSync(tempFilePath, imageData);
 
-      const outputPath = path.join(thumbnailPath, `${hashedFileName}.gif`);
+      const outputPath = path.join(thumbnailPath, `${hashedFileName}`);
 
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
@@ -296,7 +299,7 @@ const downloadImage = async ({
     }
 
     if (nft) {
-      nft.imageRoute = "/" + hashedFileName;
+      nft.imageRoute = hashedFileName;
       nft.isImageUploaded = true;
       await nftRepository.update({ id: nftId }, nft);
     }
