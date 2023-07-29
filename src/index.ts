@@ -5,7 +5,7 @@ import morgan, { token } from "morgan";
 import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
-import path from "path";
+import path, { format } from "path";
 import sharp from "sharp";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
@@ -13,6 +13,7 @@ import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import { HttpsProxyAgent } from "https-proxy-agent";
+import svg2png from "svg2png";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
@@ -115,7 +116,6 @@ const downloadImage = async ({
     );
     return;
   }
-
   try {
     let imageData;
     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
@@ -172,7 +172,6 @@ const downloadImage = async ({
         throw error;
       }
     }
-
     let baseDirectory = __dirname;
 
     if (IS_PRODUCTION) {
@@ -185,6 +184,20 @@ const downloadImage = async ({
         "images",
         contractAddress
       );
+    }
+
+    const IMAGE_FORMAT_LIST = [
+      "gif",
+      "jpeg",
+      "jpg",
+      "mp4",
+      "png",
+      "svg+xml",
+      "tiff",
+      "webp",
+    ];
+    if (format && IMAGE_FORMAT_LIST?.includes(format)) {
+      format = undefined;
     }
 
     if (!format && imageUrl) {
@@ -210,7 +223,12 @@ const downloadImage = async ({
       format = "png";
     }
 
-    const hashedFileName = encrypt(tokenId) + `.${format}`;
+    let hashedFileName;
+    if (format === "svg+xml") {
+      hashedFileName = encrypt(tokenId) + ".png";
+    } else {
+      hashedFileName = encrypt(tokenId) + `.${format}`;
+    }
     const thumbnailPath = path.join(baseDirectory, "thumbnail");
 
     // No special case for mp4 anymore
@@ -218,12 +236,19 @@ const downloadImage = async ({
       fs.mkdirSync(thumbnailPath, { recursive: true });
     }
 
-    if (["jpeg", "png", "webp", "tiff"].includes(format)) {
+    if (["jpeg", "jpg", "png", "webp", "tiff"].includes(format)) {
       // For image formats that Sharp can handle, we resize and change format
       const transformer = sharp(imageData)
         .resize(200)
         .toFormat(format as any);
       await transformer.toFile(path.join(thumbnailPath, hashedFileName));
+    } else if (format === "svg+xml") {
+      // SVG를 PNG로 변환
+      const pngImage = await svg2png(imageData, {
+        width: 512,
+        height: 512,
+      });
+      fs.writeFileSync(path.join(thumbnailPath, hashedFileName), pngImage);
     } else if (format === "gif") {
       const tempFilePath = path.join(
         thumbnailPath,
