@@ -1,7 +1,7 @@
 import "./env";
 import express, { Request, Response } from "express";
 import cors from "cors";
-import morgan from "morgan";
+import morgan, { token } from "morgan";
 import axios from "axios";
 import crypto from "crypto";
 import fs from "fs";
@@ -247,7 +247,7 @@ const downloadImage = async ({
     } else if (format === "mp4") {
       const tempFilePath = path.join(
         thumbnailPath,
-        `${encrypt("12312")}_temp.mp4`
+        `${encrypt(tokenId)}_temp.mp4`
       );
       fs.writeFileSync(tempFilePath, imageData);
 
