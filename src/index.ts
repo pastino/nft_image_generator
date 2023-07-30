@@ -79,7 +79,7 @@ const limiters = new Map<string, Bottleneck>();
 const getLimiterForServer = (server: string) => {
   if (!limiters.has(server)) {
     const limiter = new Bottleneck({
-      minTime: 200, // 1초에 3개까지 요청
+      minTime: 5000, // 1초에 3개까지 요청
     });
     limiters.set(server, limiter);
   }
