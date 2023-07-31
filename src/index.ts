@@ -15,7 +15,7 @@ import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
+const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 
 const app = express();
 app.use(morgan("dev"));
