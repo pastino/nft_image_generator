@@ -10,7 +10,7 @@ import sharp from "sharp";
 import { createConnection, getRepository } from "typeorm";
 import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
-// import ffmpeg from "fluent-ffmpeg";
+import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import svg2png from "svg2png";
@@ -31,12 +31,12 @@ app.use(
 );
 
 const proxyUrls = [
-  "http://3.36.128.152:3128",
-  "http://43.201.115.129:3128",
-  "http://13.125.246.212:3128",
-  "http://13.124.178.240:3128",
-  "http://13.125.146.26:3128",
-  "http://43.202.62.251:3128",
+  // "http://3.36.128.152:3128",
+  // "http://43.201.115.129:3128",
+  // "http://13.125.246.212:3128",
+  // "http://13.124.178.240:3128",
+  // "http://13.125.146.26:3128",
+  // "http://43.202.62.251:3128",
   "", // 프록시 없음
 ];
 
@@ -252,29 +252,27 @@ const downloadImage = async ({
         height: 512,
       });
       fs.writeFileSync(path.join(thumbnailPath, hashedFileName), pngImage);
-    }
-    // else if (format === "gif") {
-    //   const tempFilePath = path.join(
-    //     thumbnailPath,
-    //     `${encrypt(tokenId)}_temp.gif`
-    //   );
-    //   fs.writeFileSync(tempFilePath, imageData);
+    } else if (format === "gif") {
+      const tempFilePath = path.join(
+        thumbnailPath,
+        `${encrypt(tokenId)}_temp.gif`
+      );
+      fs.writeFileSync(tempFilePath, imageData);
 
-    //   const outputPath = path.join(thumbnailPath, hashedFileName);
+      const outputPath = path.join(thumbnailPath, hashedFileName);
 
-    //   await new Promise((resolve, reject) => {
-    //     ffmpeg(tempFilePath)
-    //       .outputOptions("-vf scale=200:-1") // Resize the GIF
-    //       .output(outputPath)
-    //       .on("end", () => {
-    //         fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
-    //         resolve(undefined);
-    //       })
-    //       .on("error", reject)
-    //       .run(); // Run the command
-    //   });
-    // }
-    else if (format === "mp4") {
+      await new Promise((resolve, reject) => {
+        ffmpeg(tempFilePath)
+          .outputOptions("-vf scale=200:-1") // Resize the GIF
+          .output(outputPath)
+          .on("end", () => {
+            fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
+            resolve(undefined);
+          })
+          .on("error", reject)
+          .run(); // Run the command
+      });
+    } else if (format === "mp4") {
       const tempFilePath = path.join(
         thumbnailPath,
         `${encrypt(tokenId)}_temp.mp4`
@@ -283,19 +281,19 @@ const downloadImage = async ({
 
       const outputPath = path.join(thumbnailPath, `${hashedFileName}`);
 
-      // await new Promise((resolve, reject) => {
-      //   ffmpeg(tempFilePath)
-      //     .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
-      //     .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
-      //     .toFormat("gif")
-      //     .output(outputPath)
-      //     .on("end", () => {
-      //       fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
-      //       resolve(undefined);
-      //     })
-      //     .on("error", reject)
-      //     .run(); // Run the command
-      // });
+      await new Promise((resolve, reject) => {
+        ffmpeg(tempFilePath)
+          .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
+          .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
+          .toFormat("gif")
+          .output(outputPath)
+          .on("end", () => {
+            fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
+            resolve(undefined);
+          })
+          .on("error", reject)
+          .run(); // Run the command
+      });
     } else {
       fs.writeFileSync(path.join(thumbnailPath, hashedFileName), imageData);
     }
