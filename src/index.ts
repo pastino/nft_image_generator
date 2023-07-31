@@ -18,22 +18,6 @@ import svg2png from "svg2png";
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
 
-ffmpeg("/path/to/your/input/file")
-  .output("/path/to/your/output/file")
-  .on("start", function (commandLine) {
-    console.log("Spawned FFmpeg with command: " + commandLine);
-  })
-  .on("stderr", function (stderrLine) {
-    console.log("Stderr output: " + stderrLine);
-  })
-  .on("end", function (stdout, stderr) {
-    console.log("Transcoding succeeded !");
-  })
-  .on("error", function (err) {
-    console.log("An error occurred: " + err.message);
-  })
-  .run();
-
 const app = express();
 app.use(morgan("dev"));
 app.use(express.json());
