@@ -31,12 +31,12 @@ app.use(
 );
 
 const proxyUrls = [
-  // "http://3.36.128.152:3128",
-  // "http://43.201.115.129:3128",
-  // "http://13.125.246.212:3128",
-  // "http://13.124.178.240:3128",
-  // "http://13.125.146.26:3128",
-  // "http://43.202.62.251:3128",
+  "http://3.36.128.152:3128",
+  "http://43.201.115.129:3128",
+  "http://13.125.246.212:3128",
+  "http://13.124.178.240:3128",
+  "http://13.125.146.26:3128",
+  "http://43.202.62.251:3128",
   "", // 프록시 없음
 ];
 
@@ -227,7 +227,7 @@ const downloadImage = async ({
     let hashedFileName;
     if (format === "svg+xml") {
       hashedFileName = encrypt(tokenId) + ".png";
-    } else if ("mp4") {
+    } else if (format === "mp4") {
       hashedFileName = encrypt(tokenId) + ".gif";
     } else {
       hashedFileName = encrypt(tokenId) + `.${format}`;
