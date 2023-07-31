@@ -319,7 +319,7 @@ app.post("/image", async (req: Request, res: Response) => {
   }: any = req;
   try {
     // 이미지 생성
-    // await downloadImage({ nftId, imageUrl, contractAddress, tokenId, format });
+    await downloadImage({ nftId, imageUrl, contractAddress, tokenId, format });
     return res.status(200).json(true);
   } catch (e: any) {
     console.log(e.message);
