@@ -252,53 +252,51 @@ const downloadImage = async ({
         height: 512,
       });
       fs.writeFileSync(path.join(thumbnailPath, hashedFileName), pngImage);
-    } else if (format === "gif") {
-      const tempFilePath = path.join(
-        thumbnailPath,
-        `${encrypt(tokenId)}_temp.gif`
-      );
-      fs.writeFileSync(tempFilePath, imageData);
+    }
+    // else if (format === "gif") {
+    //   const tempFilePath = path.join(
+    //     thumbnailPath,
+    //     `${encrypt(tokenId)}_temp.gif`
+    //   );
+    //   fs.writeFileSync(tempFilePath, imageData);
 
-      const outputPath = path.join(thumbnailPath, hashedFileName);
-      await new Promise((resolve, reject) => {
-        ffmpeg(tempFilePath)
-          .outputOptions("-vf scale=200:-1") // Resize the GIF
-          .output(outputPath)
-          .on("end", () => {
-            fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
-            resolve(undefined);
-          })
-          .on("error", (err) => reject(err)) // Pass the error to reject, so it can be caught and printed
-          .run(); // Run the command
-      });
-    } else if (format === "mp4") {
-      const tempFilePath = path.join(
-        thumbnailPath,
-        `${encrypt(tokenId)}_temp.mp4`
-      );
-      fs.writeFileSync(tempFilePath, imageData);
+    //   const outputPath = path.join(thumbnailPath, hashedFileName);
 
-      const outputPath = path.join(thumbnailPath, `${hashedFileName}`);
+    //   await new Promise((resolve, reject) => {
+    //     ffmpeg(tempFilePath)
+    //       .outputOptions("-vf scale=200:-1") // Resize the GIF
+    //       .output(outputPath)
+    //       .on("end", () => {
+    //         fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
+    //         resolve(undefined);
+    //       })
+    //       .on("error", reject)
+    //       .run(); // Run the command
+    //   });
+    // } else if (format === "mp4") {
+    //   const tempFilePath = path.join(
+    //     thumbnailPath,
+    //     `${encrypt(tokenId)}_temp.mp4`
+    //   );
+    //   fs.writeFileSync(tempFilePath, imageData);
 
-      await new Promise((resolve, reject) => {
-        const ffmpegCommand = ffmpeg(tempFilePath)
-          .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
-          .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
-          .toFormat("gif")
-          .output(outputPath)
-          .on("error", function (err, stdout, stderr) {
-            console.log("Cannot process video: " + err.message);
-            console.log("ffmpeg stdout: " + stdout);
-            console.log("ffmpeg stderr: " + stderr);
-            reject(err);
-          })
-          .on("end", () => {
-            fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
-            resolve(undefined);
-          })
-          .run(); // Run the command
-      });
-    } else {
+    //   const outputPath = path.join(thumbnailPath, `${hashedFileName}`);
+
+    //   await new Promise((resolve, reject) => {
+    //     ffmpeg(tempFilePath)
+    //       .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
+    //       .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
+    //       .toFormat("gif")
+    //       .output(outputPath)
+    //       .on("end", () => {
+    //         fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
+    //         resolve(undefined);
+    //       })
+    //       .on("error", reject)
+    //       .run(); // Run the command
+    //   });
+    // }
+    else {
       fs.writeFileSync(path.join(thumbnailPath, hashedFileName), imageData);
     }
 
