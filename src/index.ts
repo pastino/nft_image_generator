@@ -12,7 +12,6 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
-import { HttpsProxyAgent } from "https-proxy-agent";
 import svg2png from "svg2png";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -29,27 +28,6 @@ app.use(
     credentials: true,
   })
 );
-
-const proxyUrls = [
-  "http://3.36.128.152:3128",
-  "http://43.201.115.129:3128",
-  "http://13.125.246.212:3128",
-  "http://13.124.178.240:3128",
-  "http://13.125.146.26:3128",
-  "http://43.202.62.251:3128",
-  "", // 프록시 없음
-];
-
-let proxyIndex = 0;
-
-const getProxyAgent = () => {
-  const proxyUrl = proxyUrls[proxyIndex];
-  proxyIndex = (proxyIndex + 1) % proxyUrls.length; // 다음 프록시를 선택
-  if (proxyUrl === "") {
-    return undefined; // 프록시 없음
-  }
-  return new HttpsProxyAgent(proxyUrl);
-};
 
 const axiosInstance = axios.create();
 
@@ -158,7 +136,6 @@ const downloadImage = async ({
             await axiosInstance.get(imageUrl as string, {
               responseType: "arraybuffer",
               maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
-              httpsAgent: getProxyAgent(),
             })
         );
         imageData = response.data;
