@@ -13,6 +13,10 @@ jobs:
     runs-on: [self-hosted]
 
     steps:
+      - name: Run image_update_and_deploy.sh
+        run: |
+          ~/image_update_and_deploy.sh
+
       - uses: actions/checkout@v2
         with:
           clean: false
