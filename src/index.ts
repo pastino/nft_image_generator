@@ -3,16 +3,15 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import morgan from "morgan";
 import axios from "axios";
-import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import sharp from "sharp";
-import { createConnection, getRepository } from "typeorm";
-import { NFT } from "./shared/entities/NFT";
+import { createConnection } from "typeorm";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
+import zlib from "zlib";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
@@ -31,26 +30,6 @@ app.use(
 
 const axiosInstance = axios.create();
 
-const encrypt = (tokenId: string | number) => {
-  const cipher = crypto.createCipher(
-    "aes-256-cbc",
-    process.env.SECRET as string
-  );
-  let encrypted = cipher.update(String(tokenId), "utf8", "hex");
-  encrypted += cipher.final("hex");
-  return encrypted;
-};
-
-const decrypt = (encrypted: string) => {
-  const decipher = crypto.createDecipher(
-    "aes-256-cbc",
-    process.env.SECRET as string
-  );
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
-};
-
 // 서버 주소를 키로 하고, 해당 서버의 Bottleneck 인스턴스를 값으로 하는 Map을 생성합니다.
 const limiters = new Map<string, Bottleneck>();
 
@@ -65,54 +44,18 @@ const getLimiterForServer = (server: string) => {
 };
 
 const downloadImage = async ({
-  nftId,
   imageUrl,
-  contractAddress,
-  tokenId,
   format,
 }: {
-  nftId: number;
-  imageUrl?: string;
-  contractAddress: string;
-  tokenId?: string | number;
+  imageUrl: string;
   format?: string;
 }) => {
-  const nftRepository = getRepository(NFT);
-  const nft = await nftRepository.findOne({
-    where: { id: nftId },
-  });
-
-  if (!nft || !imageUrl || !tokenId || !contractAddress) {
-    let failedMessage = "";
-    if (!nft) failedMessage = "nft가 없습니다.";
-    if (!imageUrl) failedMessage = "imageUrl가 없습니다.";
-    if (!tokenId) failedMessage = "tokenId가 없습니다.";
-    if (!contractAddress) failedMessage = "contractAddress가 없습니다.";
-    await nftRepository.update(
-      { id: nftId },
-      { isImageUploaded: false, imageSaveError: failedMessage }
-    );
-    return;
-  }
   try {
     let imageData;
     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
       const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
       imageData = Buffer.from(base64Data, "base64");
     } else {
-      if (!imageUrl) {
-        if (nft) {
-          await nftRepository.update(
-            { id: nftId },
-            {
-              isImageUploaded: false,
-              imageSaveError: "imageUrl이 제공되지 않았습니다.",
-            }
-          );
-        }
-        return;
-      }
-
       let server = "";
       if (imageUrl.startsWith("ipfs://")) {
         let ipfsHash = imageUrl.split("ipfs://")[1];
@@ -149,19 +92,8 @@ const downloadImage = async ({
         throw error;
       }
     }
-    let baseDirectory = __dirname;
 
-    if (IS_PRODUCTION) {
-      baseDirectory = path.join(
-        __dirname,
-        "..",
-        "..",
-        "www",
-        "html",
-        "images",
-        contractAddress
-      );
-    }
+    let baseDirectory = __dirname;
 
     const IMAGE_FORMAT_LIST = [
       "gif",
@@ -184,32 +116,23 @@ const downloadImage = async ({
     }
 
     if (!format) {
-      (async () => {
-        const { fileTypeFromFile } = await (eval(
-          'import("file-type")'
-        ) as Promise<typeof import("file-type")>);
+      const { fileTypeFromBuffer } = await (eval(
+        'import("file-type")'
+      ) as Promise<typeof import("file-type")>);
 
-        await fileTypeFromFile(imageData).then((fileType) => {
-          if (fileType) {
-            format = fileType.ext;
-          }
-        });
-      })();
+      const fileType = await fileTypeFromBuffer(imageData);
+      if (fileType) {
+        format = fileType.ext;
+      }
     }
 
     if (!format) {
       format = "png";
     }
 
-    let hashedFileName;
-    if (format === "svg+xml") {
-      hashedFileName = encrypt(tokenId) + ".png";
-    } else if (format === "mp4") {
-      hashedFileName = encrypt(tokenId) + ".gif";
-    } else {
-      hashedFileName = encrypt(tokenId) + `.${format}`;
-    }
     const thumbnailPath = path.join(baseDirectory, "thumbnail");
+
+    let compressedImageData;
 
     // No special case for mp4 anymore
     if (!fs.existsSync(thumbnailPath)) {
@@ -217,27 +140,24 @@ const downloadImage = async ({
     }
 
     if (["jpeg", "jpg", "png", "webp", "tiff"].includes(format)) {
-      // For image formats that Sharp can handle, we resize and change format
       const transformer = sharp(imageData)
         .resize(200)
         .toFormat(format as any);
-      await transformer.toFile(path.join(thumbnailPath, hashedFileName));
+      imageData = await transformer.toBuffer();
+      compressedImageData = zlib.gzipSync(imageData);
     } else if (format === "svg+xml") {
       // SVG를 PNG로 변환
       const pngImage = await svg2png(imageData, {
         width: 512,
         height: 512,
       });
-      fs.writeFileSync(path.join(thumbnailPath, hashedFileName), pngImage);
+      compressedImageData = zlib.gzipSync(pngImage);
+      format = "png";
     } else if (format === "gif") {
-      const tempFilePath = path.join(
-        thumbnailPath,
-        `${encrypt(tokenId)}_temp.gif`
-      );
+      const tempFileName = String(Math.random());
+      const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.gif`);
       fs.writeFileSync(tempFilePath, imageData);
-
-      const outputPath = path.join(thumbnailPath, hashedFileName);
-
+      const outputPath = path.join(thumbnailPath);
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
           .outputOptions("-vf scale=200:-1") // Resize the GIF
@@ -249,14 +169,13 @@ const downloadImage = async ({
           .on("error", reject)
           .run(); // Run the command
       });
+      format = "gif";
     } else if (format === "mp4") {
-      const tempFilePath = path.join(
-        thumbnailPath,
-        `${encrypt(tokenId)}_temp.mp4`
-      );
+      const tempFileName = String(Math.random());
+      const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.mp4`);
       fs.writeFileSync(tempFilePath, imageData);
 
-      const outputPath = path.join(thumbnailPath, `${hashedFileName}`);
+      const outputPath = path.join(thumbnailPath, `${tempFileName}`);
 
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
@@ -266,38 +185,43 @@ const downloadImage = async ({
           .output(outputPath)
           .on("end", () => {
             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
+            compressedImageData = zlib.gzipSync(fs.readFileSync(outputPath));
             resolve(undefined);
           })
           .on("error", reject)
           .run(); // Run the command
       });
+      format = "gif";
     } else {
-      fs.writeFileSync(path.join(thumbnailPath, hashedFileName), imageData);
+      compressedImageData = zlib.gzipSync(imageData);
     }
 
-    if (nft) {
-      nft.imageRoute = hashedFileName;
-      nft.isImageUploaded = true;
-      await nftRepository.update({ id: nftId }, nft);
-    }
-    console.log("파일을 다운로드하고 저장했습니다.");
+    return { compressedImageData, format };
   } catch (error: any) {
-    if (nft)
-      await nftRepository.update(
-        { id: nftId },
-        { isImageUploaded: false, imageSaveError: error.message }
-      );
+    console.log(error);
   }
 };
 
 app.post("/image", async (req: Request, res: Response) => {
   const {
-    body: { nftId, imageUrl, contractAddress, tokenId, format },
+    body: { imageUrl, format },
   }: any = req;
   try {
     // 이미지 생성
-    await downloadImage({ nftId, imageUrl, contractAddress, tokenId, format });
-    return res.status(200).json(true);
+    const { compressedImageData, format: imgFormat }: any = await downloadImage(
+      {
+        imageUrl,
+        format,
+      }
+    );
+    const base64ImageData = compressedImageData.toString("base64");
+
+    return res.status(200).json({
+      success: true,
+      base64ImageData,
+      imgFormat,
+      contentType: "image/png",
+    }); // MIME type should be adjusted accordingly
   } catch (e: any) {
     console.log(e.message);
     return res.status(400).json(false);
@@ -312,5 +236,5 @@ createConnection(connectionOptions)
     });
   })
   .catch((error) => {
-    console.log(error);
+    console.log("error", error);
   });
