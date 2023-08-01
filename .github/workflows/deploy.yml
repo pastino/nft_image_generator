@@ -43,8 +43,10 @@ jobs:
         run: |
           process_name="nft_image_generator"
           process_list=$(npx pm2 jlist)
-          process_exists=$(echo $process_list | jq ".[] | select(.name==\"$process_name\")")
-          if [ -n "$process_exists" ]; then
+          echo "process_list: $process_list"
+
+          process_exists=$(echo $process_list | grep -q "\"name\":\"$process_name\""; echo $?)
+          if [ $process_exists -eq 0 ]; then
             npx pm2 delete $process_name
           else
             echo "'$process_name' process not found, skipping deletion."
