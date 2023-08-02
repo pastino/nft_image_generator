@@ -78,7 +78,7 @@ const downloadImage = async ({
           async () =>
             await axiosInstance.get(imageUrl as string, {
               responseType: "arraybuffer",
-              maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
+              maxContentLength: 12 * 1024 * 1024 * 1024, // 12GB
             })
         );
         imageData = response.data;
@@ -223,17 +223,8 @@ app.post("/image", async (req: Request, res: Response) => {
       imageUrl,
       format,
     });
-    const base64ImageData = compressedImageData.toString("base64");
 
-    if (!compressedImageData) {
-      return res.status(400).json({
-        success: false,
-        base64ImageData,
-        imgFormat,
-        contentType: "image/png",
-        error,
-      });
-    }
+    const base64ImageData = compressedImageData.toString("base64");
 
     return res.status(200).json({
       success: true,
@@ -244,7 +235,13 @@ app.post("/image", async (req: Request, res: Response) => {
     }); // MIME type should be adjusted accordingly
   } catch (e: any) {
     console.log(e.message);
-    return res.status(400).json(false);
+    return res.status(400).json({
+      success: false,
+      base64ImageData: "",
+      imgFormat: "",
+      contentType: "",
+      error: e.message,
+    });
   }
 });
 
