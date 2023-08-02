@@ -83,12 +83,7 @@ const downloadImage = async ({
         );
         imageData = response.data;
       } catch (error: any) {
-        if (error.response && error.response.status === 429) {
-          const retryAfter = error.response.headers["retry-after"];
-          console.log(
-            `429 error occurred. Retry after 1 minute. Server: ${server}, ${imageUrl}: retryAfter: ${retryAfter}`
-          );
-        }
+        console.log(error.message);
         throw error;
       }
     }
@@ -115,7 +110,7 @@ const downloadImage = async ({
       format = ext.replace(".", "");
     }
 
-    if (!format) {
+    if (!format && imageData) {
       const { fileTypeFromBuffer } = await (eval(
         'import("file-type")'
       ) as Promise<typeof import("file-type")>);
@@ -196,9 +191,9 @@ const downloadImage = async ({
       compressedImageData = zlib.gzipSync(imageData);
     }
 
-    return { compressedImageData, format };
+    return { compressedImageData, format, error: "" };
   } catch (error: any) {
-    console.log(error);
+    return { compressedImageData: "", format: "", error: error.message };
   }
 };
 
@@ -208,19 +203,32 @@ app.post("/image", async (req: Request, res: Response) => {
   }: any = req;
   try {
     // 이미지 생성
-    const { compressedImageData, format: imgFormat }: any = await downloadImage(
-      {
-        imageUrl,
-        format,
-      }
-    );
+    const {
+      compressedImageData,
+      format: imgFormat,
+      error,
+    }: any = await downloadImage({
+      imageUrl,
+      format,
+    });
     const base64ImageData = compressedImageData.toString("base64");
+
+    if (!compressedImageData) {
+      return res.status(400).json({
+        success: false,
+        base64ImageData,
+        imgFormat,
+        contentType: "image/png",
+        error,
+      });
+    }
 
     return res.status(200).json({
       success: true,
       base64ImageData,
       imgFormat,
       contentType: "image/png",
+      error,
     }); // MIME type should be adjusted accordingly
   } catch (e: any) {
     console.log(e.message);
