@@ -124,7 +124,6 @@ const downloadImage = async ({
     if (!format) {
       format = "png";
     }
-
     const thumbnailPath = path.join(baseDirectory, "thumbnail");
 
     let compressedImageData;
@@ -152,13 +151,21 @@ const downloadImage = async ({
       const tempFileName = String(Math.random());
       const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.gif`);
       fs.writeFileSync(tempFilePath, imageData);
-      const outputPath = path.join(thumbnailPath);
+      const outputFilePath = path.join(
+        thumbnailPath,
+        `${tempFileName}_output.gif`
+      );
+
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
           .outputOptions("-vf scale=200:-1") // Resize the GIF
-          .output(outputPath)
+          .output(outputFilePath)
           .on("end", () => {
+            compressedImageData = zlib.gzipSync(
+              fs.readFileSync(outputFilePath)
+            );
             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
+            fs.unlinkSync(outputFilePath); // Delete the processed output file
             resolve(undefined);
           })
           .on("error", reject)
@@ -169,18 +176,23 @@ const downloadImage = async ({
       const tempFileName = String(Math.random());
       const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.mp4`);
       fs.writeFileSync(tempFilePath, imageData);
-
-      const outputPath = path.join(thumbnailPath, `${tempFileName}`);
+      const outputFilePath = path.join(
+        thumbnailPath,
+        `${tempFileName}_output.gif`
+      );
 
       await new Promise((resolve, reject) => {
         ffmpeg(tempFilePath)
           .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
           .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
           .toFormat("gif")
-          .output(outputPath)
+          .output(outputFilePath)
           .on("end", () => {
+            compressedImageData = zlib.gzipSync(
+              fs.readFileSync(outputFilePath)
+            );
             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
-            compressedImageData = zlib.gzipSync(fs.readFileSync(outputPath));
+            fs.unlinkSync(outputFilePath); // Delete the processed output file
             resolve(undefined);
           })
           .on("error", reject)
