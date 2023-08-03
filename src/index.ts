@@ -12,7 +12,6 @@ import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
 import zlib from "zlib";
-import formidable from "formidable";
 import multer from "multer";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
@@ -80,7 +79,7 @@ const downloadImage = async ({
           async () =>
             await axiosInstance.get(imageUrl as string, {
               responseType: "arraybuffer",
-              maxContentLength: 12 * 1024 * 1024 * 1024, // 12GB
+              maxContentLength: 3 * 1024 * 1024 * 1024, // 12GB
             })
         );
         imageData = response.data;
@@ -143,10 +142,7 @@ const downloadImage = async ({
       compressedImageData = zlib.gzipSync(imageData);
     } else if (format === "svg+xml") {
       // SVG를 PNG로 변환
-      const pngImage = await svg2png(imageData, {
-        width: 512,
-        height: 512,
-      });
+      const pngImage = await sharp(imageData).resize(512, 512).png().toBuffer();
       compressedImageData = zlib.gzipSync(pngImage);
       format = "png";
     } else if (format === "gif") {
