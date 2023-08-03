@@ -12,8 +12,8 @@ import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
 import zlib from "zlib";
-import formidable, { Files, Fields } from "formidable";
-import { Readable } from "stream";
+import formidable from "formidable";
+import multer from "multer";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
@@ -211,48 +211,49 @@ const downloadImage = async ({
   }
 };
 
-app.post("/image", (req: Request, res: Response) => {
-  const form = new formidable.IncomingForm();
+const upload = multer();
 
-  form.parse(req, async (err: any, fields: Fields, files: Files) => {
-    if (err) {
-      console.error("Error", err);
-      throw err;
+app.post("/image", upload.none(), async (req: Request, res: Response) => {
+  const { imageUrl, format } = req.body;
+
+  if (typeof imageUrl !== "string" || typeof format !== "string") {
+    return res.status(400).json({ error: "Invalid data" });
+  }
+
+  try {
+    const {
+      compressedImageData,
+      format: imgFormat,
+      error,
+    }: any = await downloadImage({
+      imageUrl,
+      format,
+    });
+
+    if (error) {
+      throw new Error(error);
     }
 
-    const { imageUrl, format } = fields;
-    try {
-      // 이미지 생성
-      const {
-        compressedImageData,
-        format: imgFormat,
-        error,
-      }: any = await downloadImage({
-        imageUrl: imageUrl as string,
-        format: format as string,
-      });
+    const base64ImageData = compressedImageData.toString("base64");
 
-      const base64ImageData = compressedImageData.toString("base64");
-
-      return res.status(200).json({
-        success: true,
-        base64ImageData,
-        imgFormat,
-        contentType: "image/png",
-        error,
-      }); // MIME type should be adjusted accordingly
-    } catch (e: any) {
-      console.log(e.message);
-      return res.status(400).json({
-        success: false,
-        base64ImageData: "",
-        imgFormat: "",
-        contentType: "",
-        error: e.message,
-      });
-    }
-  });
+    return res.status(200).json({
+      success: true,
+      base64ImageData,
+      imgFormat,
+      contentType: "image/png",
+    });
+  } catch (e: any) {
+    console.log(e.message);
+    return res.status(400).json({
+      success: false,
+      base64ImageData: "",
+      imgFormat: "",
+      contentType: "",
+      error: e.message,
+    });
+  }
 });
+
 createConnection(connectionOptions)
   .then(() => {
     console.log("DB CONNECTION!");
