@@ -12,6 +12,8 @@ import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
 import zlib from "zlib";
+import formidable, { Files, Fields } from "formidable";
+import { Readable } from "stream";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
@@ -209,42 +211,48 @@ const downloadImage = async ({
   }
 };
 
-app.post("/image", async (req: Request, res: Response) => {
-  const {
-    body: { imageUrl, format },
-  }: any = req;
-  try {
-    // 이미지 생성
-    const {
-      compressedImageData,
-      format: imgFormat,
-      error,
-    }: any = await downloadImage({
-      imageUrl,
-      format,
-    });
+app.post("/image", (req: Request, res: Response) => {
+  const form = new formidable.IncomingForm();
 
-    const base64ImageData = compressedImageData.toString("base64");
+  form.parse(req, async (err: any, fields: Fields, files: Files) => {
+    if (err) {
+      console.error("Error", err);
+      throw err;
+    }
 
-    return res.status(200).json({
-      success: true,
-      base64ImageData,
-      imgFormat,
-      contentType: "image/png",
-      error,
-    }); // MIME type should be adjusted accordingly
-  } catch (e: any) {
-    console.log(e.message);
-    return res.status(400).json({
-      success: false,
-      base64ImageData: "",
-      imgFormat: "",
-      contentType: "",
-      error: e.message,
-    });
-  }
+    const { imageUrl, format } = fields;
+    try {
+      // 이미지 생성
+      const {
+        compressedImageData,
+        format: imgFormat,
+        error,
+      }: any = await downloadImage({
+        imageUrl: imageUrl as string,
+        format: format as string,
+      });
+
+      const base64ImageData = compressedImageData.toString("base64");
+
+      return res.status(200).json({
+        success: true,
+        base64ImageData,
+        imgFormat,
+        contentType: "image/png",
+        error,
+      }); // MIME type should be adjusted accordingly
+    } catch (e: any) {
+      console.log(e.message);
+      return res.status(400).json({
+        success: false,
+        base64ImageData: "",
+        imgFormat: "",
+        contentType: "",
+        error: e.message,
+      });
+    }
+  });
 });
-
 createConnection(connectionOptions)
   .then(() => {
     console.log("DB CONNECTION!");
