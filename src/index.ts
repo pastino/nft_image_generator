@@ -10,9 +10,14 @@ import { createConnection } from "typeorm";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
-import svg2png from "svg2png";
 import zlib from "zlib";
 import multer from "multer";
+import request from "request";
+import os from "os";
+import { promisify } from "util";
+import stream from "stream";
+
+const pipeline = promisify(stream.pipeline);
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
@@ -53,6 +58,7 @@ const downloadImage = async ({
 }) => {
   try {
     let imageData;
+
     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
       const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
       imageData = Buffer.from(base64Data, "base64");
@@ -74,19 +80,15 @@ const downloadImage = async ({
       }
 
       const limiter = getLimiterForServer(server);
-      try {
-        const response = await limiter.schedule(
-          async () =>
-            await axiosInstance.get(imageUrl as string, {
-              responseType: "arraybuffer",
-              maxContentLength: 3 * 1024 * 1024 * 1024, // 12GB
-            })
-        );
-        imageData = response.data;
-      } catch (error: any) {
-        console.log(error.message);
-        throw error;
-      }
+
+      const response = await limiter.schedule(
+        async () =>
+          await axiosInstance.get(imageUrl as string, {
+            responseType: "arraybuffer",
+            maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
+          })
+      );
+      imageData = response.data;
     }
 
     let baseDirectory = __dirname;
@@ -201,9 +203,9 @@ const downloadImage = async ({
       compressedImageData = zlib.gzipSync(imageData);
     }
 
-    return { compressedImageData, format, error: "" };
+    return { compressedImageData, format };
   } catch (error: any) {
-    return { compressedImageData: "", format: "", error: error.message };
+    throw error;
   }
 };
 
@@ -217,18 +219,12 @@ app.post("/image", upload.none(), async (req: Request, res: Response) => {
   }
 
   try {
-    const {
-      compressedImageData,
-      format: imgFormat,
-      error,
-    }: any = await downloadImage({
-      imageUrl,
-      format,
-    });
-
-    if (error) {
-      throw new Error(error);
-    }
+    const { compressedImageData, format: imgFormat }: any = await downloadImage(
+      {
+        imageUrl,
+        format,
+      }
+    );
 
     const base64ImageData = compressedImageData.toString("base64");
 
@@ -239,8 +235,7 @@ app.post("/image", upload.none(), async (req: Request, res: Response) => {
       contentType: "image/png",
     });
   } catch (e: any) {
-    console.log(e.message);
-    return res.status(400).json({
+    return res.status(200).json({
       success: false,
       base64ImageData: "",
       imgFormat: "",
