@@ -121,9 +121,12 @@ async function processQueue() {
     return;
   }
 
-  console.log(`Queue length: ${requestQueue.length}`); // Display the current length of the queue
-
   const currentTime = Date.now();
+
+  console.log(
+    `Queue length: ${requestQueue.length}`,
+    currentTime - requestQueue?.[0].retryTime
+  ); // Display the current length of the queue
 
   // filter requests whose retryTime has come
   const readyRequests = requestQueue.filter(
