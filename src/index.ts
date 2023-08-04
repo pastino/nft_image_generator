@@ -303,6 +303,10 @@ const downloadImage = async ({
       imageData = await makeRequest({
         imageUrl,
         server,
+        nftId,
+        contractAddress,
+        tokenId,
+        format,
       });
       if (imageData === null) {
         await nftRepository.update(
