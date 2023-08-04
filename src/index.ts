@@ -1,261 +1,3 @@
-// import "./env";
-// import express, { Request, Response } from "express";
-// import cors from "cors";
-// import morgan from "morgan";
-// import axios from "axios";
-// import fs from "fs";
-// import path from "path";
-// import sharp from "sharp";
-// import { createConnection } from "typeorm";
-// import connectionOptions from "./shared/ormconfig";
-// import ffmpeg from "fluent-ffmpeg";
-// import Bottleneck from "bottleneck";
-// import zlib from "zlib";
-// import multer from "multer";
-// import request from "request";
-// import os from "os";
-// import { promisify } from "util";
-// import stream from "stream";
-
-// const pipeline = promisify(stream.pipeline);
-
-// export const IS_PRODUCTION = process.env.NODE_ENV === "production";
-// const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
-
-// const app = express();
-// app.use(morgan("dev"));
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: false }));
-// app.use(
-//   cors({
-//     origin: true,
-//     methods: ["GET", "POST", "OPTIONS", "PUT", "DELETE"],
-//     credentials: true,
-//   })
-// );
-
-// const axiosInstance = axios.create();
-
-// // 서버 주소를 키로 하고, 해당 서버의 Bottleneck 인스턴스를 값으로 하는 Map을 생성합니다.
-// const limiters = new Map<string, Bottleneck>();
-
-// const getLimiterForServer = (server: string) => {
-//   if (!limiters.has(server)) {
-//     const limiter = new Bottleneck({
-//       minTime: 500, // 1초에 2개까지 요청
-//     });
-//     limiters.set(server, limiter);
-//   }
-//   return limiters.get(server)!;
-// };
-
-// const downloadImage = async ({
-//   imageUrl,
-//   format,
-// }: {
-//   imageUrl: string;
-//   format?: string;
-// }) => {
-//   try {
-//     let imageData;
-
-//     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
-//       const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
-//       imageData = Buffer.from(base64Data, "base64");
-//     } else {
-//       let server = "";
-//       if (imageUrl.startsWith("ipfs://")) {
-//         let ipfsHash = imageUrl.split("ipfs://")[1];
-//         if (ipfsHash.startsWith("ipfs/")) {
-//           ipfsHash = ipfsHash.split("ipfs/")[1];
-//         }
-//         imageUrl = `https://ipfs.io/ipfs/${ipfsHash}`;
-//         server = "ipfs.io";
-//       } else if (imageUrl.startsWith("ar://")) {
-//         const arweaveHash = imageUrl.split("ar://")[1];
-//         imageUrl = `https://arweave.net/${arweaveHash}`;
-//         server = "arweave.net";
-//       } else {
-//         server = imageUrl.split("/")[2];
-//       }
-
-//       const limiter = getLimiterForServer(server);
-
-//       const response = await limiter.schedule(
-//         async () =>
-//           await axiosInstance.get(imageUrl as string, {
-//             responseType: "arraybuffer",
-//             maxContentLength: 3 * 1024 * 1024 * 1024, // 3GB
-//           })
-//       );
-//       imageData = response.data;
-//     }
-
-//     let baseDirectory = __dirname;
-
-//     const IMAGE_FORMAT_LIST = [
-//       "gif",
-//       "jpeg",
-//       "jpg",
-//       "mp4",
-//       "png",
-//       "svg+xml",
-//       "tiff",
-//       "webp",
-//     ];
-
-//     if (format && !IMAGE_FORMAT_LIST?.includes(format)) {
-//       format = undefined;
-//     }
-
-//     if (!format && imageUrl) {
-//       const ext = path.extname(imageUrl).toLowerCase();
-//       format = ext.replace(".", "");
-//     }
-
-//     if (!format && imageData) {
-//       const { fileTypeFromBuffer } = await (eval(
-//         'import("file-type")'
-//       ) as Promise<typeof import("file-type")>);
-
-//       const fileType = await fileTypeFromBuffer(imageData);
-//       if (fileType) {
-//         format = fileType.ext;
-//       }
-//     }
-
-//     if (!format) {
-//       format = "png";
-//     }
-//     const thumbnailPath = path.join(baseDirectory, "thumbnail");
-
-//     let compressedImageData;
-
-//     // No special case for mp4 anymore
-//     if (!fs.existsSync(thumbnailPath)) {
-//       fs.mkdirSync(thumbnailPath, { recursive: true });
-//     }
-
-//     if (["jpeg", "jpg", "png", "webp", "tiff"].includes(format)) {
-//       const transformer = sharp(imageData)
-//         .resize(200)
-//         .toFormat(format as any);
-//       imageData = await transformer.toBuffer();
-//       compressedImageData = zlib.gzipSync(imageData);
-//     } else if (format === "svg+xml") {
-//       // SVG를 PNG로 변환
-//       const pngImage = await sharp(imageData).resize(512, 512).png().toBuffer();
-//       compressedImageData = zlib.gzipSync(pngImage);
-//       format = "png";
-//     } else if (format === "gif") {
-//       const tempFileName = String(Math.random());
-//       const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.gif`);
-//       fs.writeFileSync(tempFilePath, imageData);
-//       const outputFilePath = path.join(
-//         thumbnailPath,
-//         `${tempFileName}_output.gif`
-//       );
-
-//       await new Promise((resolve, reject) => {
-//         ffmpeg(tempFilePath)
-//           .outputOptions("-vf scale=200:-1") // Resize the GIF
-//           .output(outputFilePath)
-//           .on("end", () => {
-//             compressedImageData = zlib.gzipSync(
-//               fs.readFileSync(outputFilePath)
-//             );
-//             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed GIF file
-//             fs.unlinkSync(outputFilePath); // Delete the processed output file
-//             resolve(undefined);
-//           })
-//           .on("error", reject)
-//           .run(); // Run the command
-//       });
-//       format = "gif";
-//     } else if (format === "mp4") {
-//       const tempFileName = String(Math.random());
-//       const tempFilePath = path.join(thumbnailPath, `${tempFileName}_temp.mp4`);
-//       fs.writeFileSync(tempFilePath, imageData);
-//       const outputFilePath = path.join(
-//         thumbnailPath,
-//         `${tempFileName}_output.gif`
-//       );
-
-//       await new Promise((resolve, reject) => {
-//         ffmpeg(tempFilePath)
-//           .outputOptions("-vf", "scale=320:-1") // scale filter for resizing, you can adjust as needed
-//           .outputOptions("-r 10") // Set frame rate (Hz value, fraction or abbreviation), adjust as needed
-//           .toFormat("gif")
-//           .output(outputFilePath)
-//           .on("end", () => {
-//             compressedImageData = zlib.gzipSync(
-//               fs.readFileSync(outputFilePath)
-//             );
-//             fs.unlinkSync(tempFilePath); // Delete the original, unprocessed video file
-//             fs.unlinkSync(outputFilePath); // Delete the processed output file
-//             resolve(undefined);
-//           })
-//           .on("error", reject)
-//           .run(); // Run the command
-//       });
-//       format = "gif";
-//     } else {
-//       compressedImageData = zlib.gzipSync(imageData);
-//     }
-
-//     return { compressedImageData, format };
-//   } catch (error: any) {
-//     throw error;
-//   }
-// };
-
-// const upload = multer();
-
-// app.post("/image", upload.none(), async (req: Request, res: Response) => {
-//   const { imageUrl, format } = req.body;
-
-//   if (typeof imageUrl !== "string" || typeof format !== "string") {
-//     return res.status(400).json({ error: "Invalid data" });
-//   }
-
-//   try {
-//     const { compressedImageData, format: imgFormat }: any = await downloadImage(
-//       {
-//         imageUrl,
-//         format,
-//       }
-//     );
-
-//     const base64ImageData = compressedImageData.toString("base64");
-
-//     return res.status(200).json({
-//       success: true,
-//       base64ImageData,
-//       imgFormat,
-//       contentType: "image/png",
-//     });
-//   } catch (e: any) {
-//     return res.status(200).json({
-//       success: false,
-//       base64ImageData: "",
-//       imgFormat: "",
-//       contentType: "",
-//       error: e.message,
-//     });
-//   }
-// });
-
-// createConnection(connectionOptions)
-//   .then(() => {
-//     console.log("DB CONNECTION!");
-//     app.listen(PORT, async () => {
-//       console.log(`Listening on port: "http://localhost:${PORT}"`);
-//     });
-//   })
-//   .catch((error) => {
-//     console.log("error", error);
-//   });
-
 import "./env";
 import express, { Request, Response } from "express";
 import cors from "cors";
@@ -270,10 +12,19 @@ import { NFT } from "./shared/entities/NFT";
 import connectionOptions from "./shared/ormconfig";
 import ffmpeg from "fluent-ffmpeg";
 import Bottleneck from "bottleneck";
-import svg2png from "svg2png";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
+
+type QueueItem = {
+  retryTime: number;
+  server: string;
+  nftId: number;
+  imageUrl?: string;
+  contractAddress: string;
+  tokenId?: string | number;
+  format?: string;
+};
 
 const app = express();
 app.use(morgan("dev"));
@@ -336,13 +87,33 @@ const decreaseRequestCount = (server: string) => {
     }
   }
 };
-const requestQueue: { imageUrl: string; retryAfter: number; server: string }[] =
-  [];
+const requestQueue: QueueItem[] = [];
 
-function addToQueue(imageUrl: string, retryAfter: number, server: string) {
-  requestQueue.push({ imageUrl, retryAfter, server });
+function addToQueue({
+  retryTime,
+  server,
+  nftId,
+  imageUrl,
+  contractAddress,
+  tokenId,
+  format,
+}: QueueItem) {
+  const newQueueItem = {
+    retryTime,
+    server,
+    nftId,
+    imageUrl,
+    contractAddress,
+    tokenId,
+    format,
+  };
+
+  // Add the new request to the queue.
+  requestQueue.push(newQueueItem);
+
+  // Sort the queue by retryTime.
+  requestQueue.sort((a, b) => a.retryTime - b.retryTime);
 }
-
 async function processQueue() {
   if (requestQueue.length === 0) {
     setTimeout(processQueue, 1000); // Next tick.
@@ -351,13 +122,20 @@ async function processQueue() {
 
   const currentTime = Date.now();
 
-  const { imageUrl, retryAfter, server } = requestQueue[0];
+  const { retryTime, nftId, imageUrl, contractAddress, tokenId, format } =
+    requestQueue[0];
 
-  if (currentTime >= retryAfter) {
+  if (currentTime >= retryTime) {
     // remove the first element from the queue
     requestQueue.shift();
     // execute the function
-    await makeRequest(imageUrl, server);
+    await downloadImage({
+      nftId,
+      imageUrl,
+      contractAddress,
+      tokenId,
+      format,
+    });
     setTimeout(processQueue, 1000); // Next tick.
   } else {
     setTimeout(processQueue, 1000); // Next tick.
@@ -367,13 +145,28 @@ async function processQueue() {
 // Call processQueue initially.
 processQueue();
 
-async function makeRequest(imageUrl: string, server: string) {
+async function makeRequest({
+  nftId,
+  imageUrl,
+  contractAddress,
+  tokenId,
+  format,
+  server,
+}: any) {
   const currentTime = Date.now();
   const queueItem = requestQueue.find(
-    (item) => item.server === server && item.retryAfter > currentTime
+    (item) => item.server === server && item.retryTime > currentTime
   );
   if (queueItem) {
-    addToQueue(imageUrl, queueItem.retryAfter, server);
+    addToQueue({
+      nftId,
+      retryTime: queueItem.retryTime,
+      server,
+      contractAddress,
+      format,
+      imageUrl,
+      tokenId,
+    });
     return null;
   }
 
@@ -401,7 +194,15 @@ async function makeRequest(imageUrl: string, server: string) {
       const retryTime = Date.now() + retryAfterMs;
 
       // Add the request to the queue.
-      addToQueue(imageUrl, retryTime, server);
+      addToQueue({
+        nftId,
+        retryTime,
+        server,
+        contractAddress,
+        format,
+        imageUrl,
+        tokenId,
+      });
       return null; // 429 오류 발생 시 null 반환
     } else {
       throw error;
@@ -474,7 +275,10 @@ const downloadImage = async ({
         server = imageUrl.split("/")[2];
       }
 
-      imageData = await makeRequest(imageUrl, server);
+      imageData = await makeRequest({
+        imageUrl,
+        server,
+      });
       if (imageData === null) {
         await nftRepository.update(
           { id: nftId },
