@@ -273,7 +273,7 @@ import Bottleneck from "bottleneck";
 import svg2png from "svg2png";
 
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const PORT = IS_PRODUCTION ? process.env.PORT : 9999;
+const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
 
 const app = express();
 app.use(morgan("dev"));
@@ -311,6 +311,7 @@ const decrypt = (encrypted: string) => {
 
 // 서버 주소를 키로 하고, 해당 서버의 Bottleneck 인스턴스를 값으로 하는 Map을 생성합니다.
 const limiters = new Map<string, Bottleneck>();
+const requestCounts = new Map<string, number>();
 
 const getLimiterForServer = (server: string) => {
   if (!limiters.has(server)) {
@@ -318,8 +319,22 @@ const getLimiterForServer = (server: string) => {
       minTime: 500, // 1초에 2개까지 요청
     });
     limiters.set(server, limiter);
+    requestCounts.set(server, 0); // 초기 요청 횟수를 0으로 설정합니다.
   }
+  requestCounts.set(server, requestCounts.get(server)! + 1); // 요청 횟수를 1 증가시킵니다.
   return limiters.get(server)!;
+};
+
+// 요청이 완료되면 이 함수를 호출하여 요청 횟수를 감소시킵니다.
+const decreaseRequestCount = (server: string) => {
+  if (requestCounts.has(server)) {
+    requestCounts.set(server, requestCounts.get(server)! - 1); // 요청 횟수를 1 감소시킵니다.
+    if (requestCounts.get(server) === 0) {
+      // 요청 횟수가 0이면
+      limiters.delete(server); // 해당 서버의 limiter를 제거합니다.
+      requestCounts.delete(server); // 해당 서버의 요청 횟수를 제거합니다.
+    }
+  }
 };
 
 const downloadImage = async ({
@@ -397,6 +412,7 @@ const downloadImage = async ({
             })
         );
         imageData = response.data;
+        decreaseRequestCount(server);
       } catch (error: any) {
         if (error.response && error.response.status === 429) {
           const retryAfter = error.response.headers["retry-after"];
