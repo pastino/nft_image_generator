@@ -121,6 +121,8 @@ async function processQueue() {
     return;
   }
 
+  console.log(`Queue length: ${requestQueue.length}`); // Display the current length of the queue
+
   const currentTime = Date.now();
 
   // filter requests whose retryTime has come
@@ -136,7 +138,9 @@ async function processQueue() {
     format,
   } of readyRequests) {
     // execute the function
-
+    console.log(
+      `Processing queue item. NFT ID: ${nftId}, Image URL: ${imageUrl}, Contract Address: ${contractAddress}, Token ID: ${tokenId}, Format: ${format}`
+    ); // Log the item details
     await downloadImage({
       nftId,
       imageUrl,
