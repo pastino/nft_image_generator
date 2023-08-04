@@ -114,6 +114,7 @@ function addToQueue({
   // Sort the queue by retryTime.
   requestQueue.sort((a, b) => a.retryTime - b.retryTime);
 }
+
 async function processQueue() {
   if (requestQueue.length === 0) {
     setTimeout(processQueue, 1000); // Next tick.
@@ -122,13 +123,20 @@ async function processQueue() {
 
   const currentTime = Date.now();
 
-  const { retryTime, nftId, imageUrl, contractAddress, tokenId, format } =
-    requestQueue[0];
+  // filter requests whose retryTime has come
+  const readyRequests = requestQueue.filter(
+    (item) => item.retryTime <= currentTime
+  );
 
-  if (currentTime >= retryTime) {
-    // remove the first element from the queue
-    requestQueue.shift();
+  for (const {
+    nftId,
+    imageUrl,
+    contractAddress,
+    tokenId,
+    format,
+  } of readyRequests) {
     // execute the function
+
     await downloadImage({
       nftId,
       imageUrl,
@@ -136,10 +144,23 @@ async function processQueue() {
       tokenId,
       format,
     });
-    setTimeout(processQueue, 1000); // Next tick.
-  } else {
-    setTimeout(processQueue, 1000); // Next tick.
+
+    // if the download is successful, remove it from the queue
+    const index = requestQueue.findIndex(
+      (item) =>
+        item.nftId === nftId &&
+        item.imageUrl === imageUrl &&
+        item.contractAddress === contractAddress &&
+        item.tokenId === tokenId &&
+        item.format === format
+    );
+
+    if (index > -1) {
+      requestQueue.splice(index, 1);
+    }
   }
+
+  setTimeout(processQueue, 1000); // Next tick.
 }
 
 // Call processQueue initially.
