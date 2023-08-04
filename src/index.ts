@@ -336,6 +336,78 @@ const decreaseRequestCount = (server: string) => {
     }
   }
 };
+const requestQueue: { imageUrl: string; retryAfter: number; server: string }[] =
+  [];
+
+function addToQueue(imageUrl: string, retryAfter: number, server: string) {
+  requestQueue.push({ imageUrl, retryAfter, server });
+}
+
+async function processQueue() {
+  if (requestQueue.length === 0) {
+    setTimeout(processQueue, 1000); // Next tick.
+    return;
+  }
+
+  const currentTime = Date.now();
+
+  const { imageUrl, retryAfter, server } = requestQueue[0];
+
+  if (currentTime >= retryAfter) {
+    // remove the first element from the queue
+    requestQueue.shift();
+    // execute the function
+    await makeRequest(imageUrl, server);
+    setTimeout(processQueue, 1000); // Next tick.
+  } else {
+    setTimeout(processQueue, 1000); // Next tick.
+  }
+}
+
+// Call processQueue initially.
+processQueue();
+
+async function makeRequest(imageUrl: string, server: string) {
+  const currentTime = Date.now();
+  const queueItem = requestQueue.find(
+    (item) => item.server === server && item.retryAfter > currentTime
+  );
+  if (queueItem) {
+    addToQueue(imageUrl, queueItem.retryAfter, server);
+    return null;
+  }
+
+  const limiter = getLimiterForServer(server);
+  try {
+    const response = await limiter.schedule(
+      async () =>
+        await axiosInstance.get(imageUrl as string, {
+          responseType: "arraybuffer",
+          maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
+        })
+    );
+
+    decreaseRequestCount(server);
+    return response.data; // 이미지 데이터 반환
+  } catch (error: any) {
+    if (error.response && error.response.status === 429) {
+      const retryAfter = error.response.headers["retry-after"];
+      console.log(
+        `429 error occurred. Retry after ${retryAfter} seconds. Server: ${server}, ${imageUrl}`
+      );
+
+      // Convert retryAfter to milliseconds and add to the current time.
+      const retryAfterMs = Number(retryAfter) * 1000;
+      const retryTime = Date.now() + retryAfterMs;
+
+      // Add the request to the queue.
+      addToQueue(imageUrl, retryTime, server);
+      return null; // 429 오류 발생 시 null 반환
+    } else {
+      throw error;
+    }
+  }
+}
 
 const downloadImage = async ({
   nftId,
@@ -402,27 +474,19 @@ const downloadImage = async ({
         server = imageUrl.split("/")[2];
       }
 
-      const limiter = getLimiterForServer(server);
-      try {
-        const response = await limiter.schedule(
-          async () =>
-            await axiosInstance.get(imageUrl as string, {
-              responseType: "arraybuffer",
-              maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
-            })
+      imageData = await makeRequest(imageUrl, server);
+      if (imageData === null) {
+        await nftRepository.update(
+          { id: nftId },
+          {
+            isImageUploaded: false,
+            imageSaveError: "429 에러로 인한 큐 대기중...",
+          }
         );
-        imageData = response.data;
-        decreaseRequestCount(server);
-      } catch (error: any) {
-        if (error.response && error.response.status === 429) {
-          const retryAfter = error.response.headers["retry-after"];
-          console.log(
-            `429 error occurred. Retry after 1 minute. Server: ${server}, ${imageUrl}: retryAfter: ${retryAfter}`
-          );
-        }
-        throw error;
+        return;
       }
     }
+
     let baseDirectory = __dirname;
 
     if (IS_PRODUCTION) {
