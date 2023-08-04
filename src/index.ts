@@ -498,10 +498,8 @@ const downloadImage = async ({
       await transformer.toFile(path.join(thumbnailPath, hashedFileName));
     } else if (format === "svg+xml") {
       // SVG를 PNG로 변환
-      const pngImage = await svg2png(imageData, {
-        width: 512,
-        height: 512,
-      });
+      const pngImage = await sharp(imageData).resize(512, 512).png().toBuffer();
+
       fs.writeFileSync(path.join(thumbnailPath, hashedFileName), pngImage);
     } else if (format === "gif") {
       const tempFilePath = path.join(
