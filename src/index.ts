@@ -67,7 +67,7 @@ const requestCounts = new Map<string, number>();
 const getLimiterForServer = (server: string) => {
   if (!limiters.has(server)) {
     const limiter = new Bottleneck({
-      minTime: 333, // 1초에 3개까지 요청
+      minTime: 200, // 1초에 3개까지 요청
     });
     limiters.set(server, limiter);
     requestCounts.set(server, 0); // 초기 요청 횟수를 0으로 설정합니다.
