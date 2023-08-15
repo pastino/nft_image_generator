@@ -200,13 +200,17 @@ async function makeRequest({
 
   const limiter = getLimiterForServer(server);
   try {
-    const response = await limiter.schedule(
-      async () =>
-        await axiosInstance.get(imageUrl as string, {
-          responseType: "arraybuffer",
-          maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
-        })
-    );
+    // const response = await limiter.schedule(
+    //   async () =>
+    //     await axiosInstance.get(imageUrl as string, {
+    //       responseType: "arraybuffer",
+    //       maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
+    //     })
+    // );
+    const response = await axiosInstance.get(imageUrl as string, {
+      responseType: "arraybuffer",
+      maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
+    });
 
     decreaseRequestCount(server);
     return response.data; // 이미지 데이터 반환
