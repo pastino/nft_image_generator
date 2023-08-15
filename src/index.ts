@@ -198,7 +198,7 @@ async function makeRequest({
     return null;
   }
 
-  const limiter = getLimiterForServer(server);
+  // const limiter = getLimiterForServer(server);
   try {
     // const response = await limiter.schedule(
     //   async () =>
@@ -274,8 +274,23 @@ const downloadImage = async ({
   }
   try {
     let imageData;
+    const MAX_SIZE_IN_BYTES = 5 * 1024 * 1024; // 5MB
     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
       const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
+      // 길이 체크
+      if (Buffer.from(base64Data, "base64").length > MAX_SIZE_IN_BYTES) {
+        console.error("SVG 이미지 데이터가 너무 큽니다.");
+        return; // 혹은 다른 오류 처리 로직
+      }
+      imageData = Buffer.from(base64Data, "base64");
+    } else if (imageUrl.startsWith("data:image/gif;base64,")) {
+      const base64Data = imageUrl.replace(/^data:image\/gif;base64,/, "");
+
+      // 길이 체크
+      if (Buffer.from(base64Data, "base64").length > MAX_SIZE_IN_BYTES) {
+        console.error("GIF 이미지 데이터가 너무 큽니다.");
+        return; // 혹은 다른 오류 처리 로직
+      }
       imageData = Buffer.from(base64Data, "base64");
     } else {
       if (!imageUrl) {
