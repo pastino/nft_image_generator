@@ -170,8 +170,8 @@ async function processQueue() {
   setTimeout(processQueue, 1000); // Next tick.
 }
 
-// Call processQueue initially.
-processQueue();
+// // Call processQueue initially.
+// processQueue();
 
 async function makeRequest({
   nftId,
@@ -181,22 +181,22 @@ async function makeRequest({
   format,
   server,
 }: any) {
-  const currentTime = Date.now();
-  const queueItem = requestQueue.find(
-    (item) => item.server === server && item.retryTime > currentTime
-  );
-  if (queueItem) {
-    addToQueue({
-      nftId,
-      retryTime: queueItem.retryTime,
-      server,
-      contractAddress,
-      format,
-      imageUrl,
-      tokenId,
-    });
-    return null;
-  }
+  // const currentTime = Date.now();
+  // const queueItem = requestQueue.find(
+  //   (item) => item.server === server && item.retryTime > currentTime
+  // );
+  // if (queueItem) {
+  //   addToQueue({
+  //     nftId,
+  //     retryTime: queueItem.retryTime,
+  //     server,
+  //     contractAddress,
+  //     format,
+  //     imageUrl,
+  //     tokenId,
+  //   });
+  //   return null;
+  // }
 
   // const limiter = getLimiterForServer(server);
   try {
@@ -212,7 +212,7 @@ async function makeRequest({
       maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
     });
 
-    decreaseRequestCount(server);
+    // decreaseRequestCount(server);
     return response.data; // 이미지 데이터 반환
   } catch (error: any) {
     if (error.response && error.response.status === 429) {
