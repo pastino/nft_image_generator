@@ -221,20 +221,20 @@ async function makeRequest({
         `429 error occurred. Retry after ${retryAfter} seconds. Server: ${server}, ${imageUrl}`
       );
 
-      // Convert retryAfter to milliseconds and add to the current time.
-      const retryAfterMs = Number(retryAfter) * 1000;
-      const retryTime = Date.now() + retryAfterMs;
+      // // Convert retryAfter to milliseconds and add to the current time.
+      // const retryAfterMs = Number(retryAfter) * 1000;
+      // const retryTime = Date.now() + retryAfterMs;
 
-      // Add the request to the queue.
-      addToQueue({
-        nftId,
-        retryTime,
-        server,
-        contractAddress,
-        format,
-        imageUrl,
-        tokenId,
-      });
+      // // Add the request to the queue.
+      // addToQueue({
+      //   nftId,
+      //   retryTime,
+      //   server,
+      //   contractAddress,
+      //   format,
+      //   imageUrl,
+      //   tokenId,
+      // });
       return null; // 429 오류 발생 시 null 반환
     } else {
       throw error;
@@ -275,6 +275,8 @@ const downloadImage = async ({
   try {
     let imageData;
     const MAX_SIZE_IN_BYTES = 5 * 1024 * 1024; // 5MB
+
+    // TODO : svg+xml, gif외에도 종류가 많음. 관련 데이터 모두 처리
     if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
       const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
       // 길이 체크
