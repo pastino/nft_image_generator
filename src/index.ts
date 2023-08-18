@@ -276,21 +276,17 @@ const downloadImage = async ({
     let imageData;
     const MAX_SIZE_IN_BYTES = 5 * 1024 * 1024; // 5MB
 
-    // TODO : svg+xml, gif외에도 종류가 많음. 관련 데이터 모두 처리
-    if (imageUrl.startsWith("data:image/svg+xml;base64,")) {
-      const base64Data = imageUrl.replace(/^data:image\/svg\+xml;base64,/, "");
-      // 길이 체크
-      if (Buffer.from(base64Data, "base64").length > MAX_SIZE_IN_BYTES) {
-        console.error("SVG 이미지 데이터가 너무 큽니다.");
-        return; // 혹은 다른 오류 처리 로직
-      }
-      imageData = Buffer.from(base64Data, "base64");
-    } else if (imageUrl.startsWith("data:image/gif;base64,")) {
-      const base64Data = imageUrl.replace(/^data:image\/gif;base64,/, "");
+    const dataUrlPattern = /^data:image\/([a-zA-Z0-9]+);base64,/;
+    const matchResult = imageUrl.match(dataUrlPattern);
+
+    if (matchResult && matchResult[1]) {
+      const mimeType = matchResult[1];
+
+      const base64Data = imageUrl.replace(dataUrlPattern, "");
 
       // 길이 체크
       if (Buffer.from(base64Data, "base64").length > MAX_SIZE_IN_BYTES) {
-        console.error("GIF 이미지 데이터가 너무 큽니다.");
+        console.error(`${mimeType.toUpperCase()} 이미지 데이터가 너무 큽니다.`);
         return; // 혹은 다른 오류 처리 로직
       }
       imageData = Buffer.from(base64Data, "base64");
