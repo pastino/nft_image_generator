@@ -18,19 +18,9 @@ import os from "os";
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
 
-type QueueItem = {
-  retryTime: number;
-  server: string;
-  nftId: number;
-  imageUrl?: string;
-  contractAddress: string;
-  tokenId?: string | number;
-  format?: string;
-};
-
 if (cluster.isMaster) {
   // CPU 코어의 수만큼 워커 프로세스를 생성합니다.
-  const numCPUs = os.cpus().length;
+  const numCPUs = 5;
   for (let i = 0; i < numCPUs; i++) {
     cluster.fork();
   }
@@ -92,143 +82,13 @@ if (cluster.isMaster) {
     return limiters.get(server)!;
   };
 
-  // 요청이 완료되면 이 함수를 호출하여 요청 횟수를 감소시킵니다.
-  const decreaseRequestCount = (server: string) => {
-    if (requestCounts.has(server)) {
-      requestCounts.set(server, requestCounts.get(server)! - 1); // 요청 횟수를 1 감소시킵니다.
-      if (requestCounts.get(server) === 0) {
-        // 요청 횟수가 0이면
-        limiters.delete(server); // 해당 서버의 limiter를 제거합니다.
-        requestCounts.delete(server); // 해당 서버의 요청 횟수를 제거합니다.
-      }
-    }
-  };
-  const requestQueue: QueueItem[] = [];
-
-  // function addToQueue({
-  //   retryTime,
-  //   server,
-  //   nftId,
-  //   imageUrl,
-  //   contractAddress,
-  //   tokenId,
-  //   format,
-  // }: QueueItem) {
-  //   const newQueueItem = {
-  //     retryTime,
-  //     server,
-  //     nftId,
-  //     imageUrl,
-  //     contractAddress,
-  //     tokenId,
-  //     format,
-  //   };
-
-  //   // Add the new request to the queue.
-  //   requestQueue.push(newQueueItem);
-
-  //   // Sort the queue by retryTime.
-  //   requestQueue.sort((a, b) => a.retryTime - b.retryTime);
-  // }
-
-  // async function processQueue() {
-  //   if (requestQueue.length === 0) {
-  //     setTimeout(processQueue, 1000); // Next tick.
-  //     return;
-  //   }
-
-  //   const currentTime = Date.now();
-
-  //   console.log(
-  //     `Queue length: ${requestQueue.length}`,
-  //     currentTime - requestQueue?.[0].retryTime
-  //   ); // Display the current length of the queue
-
-  //   // filter requests whose retryTime has come
-  //   const readyRequests = requestQueue.filter(
-  //     (item) => item.retryTime <= currentTime
-  //   );
-
-  //   for (const {
-  //     nftId,
-  //     imageUrl,
-  //     contractAddress,
-  //     tokenId,
-  //     format,
-  //   } of readyRequests) {
-  //     // execute the function
-  //     console.log(
-  //       `Processing queue item. NFT ID: ${nftId}, Image URL: ${imageUrl}, Contract Address: ${contractAddress}, Token ID: ${tokenId}, Format: ${format}`
-  //     ); // Log the item details
-  //     await downloadImage({
-  //       nftId,
-  //       imageUrl,
-  //       contractAddress,
-  //       tokenId,
-  //       format,
-  //     });
-
-  //     // if the download is successful, remove it from the queue
-  //     const index = requestQueue.findIndex(
-  //       (item) =>
-  //         item.nftId === nftId &&
-  //         item.imageUrl === imageUrl &&
-  //         item.contractAddress === contractAddress &&
-  //         item.tokenId === tokenId &&
-  //         item.format === format
-  //     );
-
-  //     if (index > -1) {
-  //       requestQueue.splice(index, 1);
-  //     }
-  //   }
-
-  //   setTimeout(processQueue, 1000); // Next tick.
-  // }
-
-  // // Call processQueue initially.
-  // processQueue();
-
-  const makeRequest = async ({
-    nftId,
-    imageUrl,
-    contractAddress,
-    tokenId,
-    format,
-    server,
-  }: any) => {
-    // const currentTime = Date.now();
-    // const queueItem = requestQueue.find(
-    //   (item) => item.server === server && item.retryTime > currentTime
-    // );
-    // if (queueItem) {
-    //   addToQueue({
-    //     nftId,
-    //     retryTime: queueItem.retryTime,
-    //     server,
-    //     contractAddress,
-    //     format,
-    //     imageUrl,
-    //     tokenId,
-    //   });
-    //   return null;
-    // }
-
-    // const limiter = getLimiterForServer(server);
+  const makeRequest = async ({ imageUrl, server }: any) => {
     try {
-      // const response = await limiter.schedule(
-      //   async () =>
-      //     await axiosInstance.get(imageUrl as string, {
-      //       responseType: "arraybuffer",
-      //       maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
-      //     })
-      // );
       const response = await axiosInstance.get(imageUrl as string, {
         responseType: "arraybuffer",
         maxContentLength: 5 * 1024 * 1024 * 1024, // 3GB
       });
 
-      // decreaseRequestCount(server);
       return response.data; // 이미지 데이터 반환
     } catch (error: any) {
       if (error.response && error.response.status === 429) {
@@ -237,20 +97,6 @@ if (cluster.isMaster) {
           `429 error occurred. Retry after ${retryAfter} seconds. Server: ${server}, ${imageUrl}`
         );
 
-        // // Convert retryAfter to milliseconds and add to the current time.
-        // const retryAfterMs = Number(retryAfter) * 1000;
-        // const retryTime = Date.now() + retryAfterMs;
-
-        // // Add the request to the queue.
-        // addToQueue({
-        //   nftId,
-        //   retryTime,
-        //   server,
-        //   contractAddress,
-        //   format,
-        //   imageUrl,
-        //   tokenId,
-        // });
         return null; // 429 오류 발생 시 null 반환
       } else {
         throw error;
@@ -341,10 +187,6 @@ if (cluster.isMaster) {
         imageData = await makeRequest({
           imageUrl,
           server,
-          nftId,
-          contractAddress,
-          tokenId,
-          format,
         });
         if (imageData === null) {
           await nftRepository.update(
@@ -520,6 +362,7 @@ if (cluster.isMaster) {
       return res.status(400).json(false);
     }
   });
+
   createConnection(connectionOptions)
     .then(() => {
       console.log("DB CONNECTION!");
