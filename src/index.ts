@@ -20,7 +20,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9000;
 
 if (cluster.isMaster) {
   // CPU 코어의 수만큼 워커 프로세스를 생성합니다.
-  const numCPUs = 3;
+  const numCPUs = os.cpus().length;
   for (let i = 0; i < numCPUs; i++) {
     cluster.fork();
   }
