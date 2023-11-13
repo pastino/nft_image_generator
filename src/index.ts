@@ -88,20 +88,8 @@ async function processNFTs() {
         tokenId: nft.tokenId,
       });
 
-      console.log(
-        {
-          imageUrl:
-            typeof nft.imageRaw === "string"
-              ? nft.imageRaw.replace(/\x00/g, "")
-              : "",
-          contractAddress: nft.contract?.address,
-          tokenId: nft.tokenId,
-        },
-        hashedFileName
-      );
-
       if (!isSuccess) {
-        console.log("message", message);
+        console.log("message", nft.id, message);
         await getRepository(NFT).update(
           { id: nft?.id },
           { isImageUploaded: false, imageSaveError: message }
@@ -129,7 +117,6 @@ createConnection(connectionOptions)
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
 
-      console.log(1);
       await processNFTs();
       console.log("NFT 처리 완료");
 
