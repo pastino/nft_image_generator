@@ -42,6 +42,7 @@ async function processNFTs() {
   let offset = 0; // 오프셋 초기화
 
   while (true) {
+    console.log("offset", offset);
     // 조건에 맞는 NFT를 조회합니다.
     const nfts = await getRepository(NFT)
       .createQueryBuilder("nft")
@@ -69,7 +70,7 @@ async function processNFTs() {
       .take(batchSize)
       .skip(offset)
       .getMany();
-
+    console.log(nfts.length);
     // 조회된 NFT가 없으면 처리를 중단합니다.
     if (nfts.length === 0) {
       console.log("조회된 NFT가 없습니다.");
@@ -115,6 +116,7 @@ createConnection(connectionOptions)
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
 
+      console.log(1);
       await processNFTs();
       console.log("NFT 처리 완료");
 
