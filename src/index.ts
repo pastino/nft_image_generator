@@ -117,8 +117,40 @@ createConnection(connectionOptions)
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
 
-      await processNFTs();
-      console.log("NFT 처리 완료");
+      const nft = await getRepository(NFT).findOne({
+        where: { id: 206 },
+      });
+
+      if (!nft) return;
+      const { isSuccess, message, hashedFileName } = await downloadImage({
+        imageUrl:
+          typeof nft.imageRaw === "string"
+            ? nft.imageRaw.replace(/\x00/g, "")
+            : "",
+        contractAddress: nft.contract?.address,
+        tokenId: nft.tokenId,
+      });
+
+      console.log("message", message);
+
+      // if (!isSuccess) {
+      //   console.log("message", nft.id, message);
+      //   await getRepository(NFT).update(
+      //     { id: nft?.id },
+      //     { isImageUploaded: false, imageSaveError: message }
+      //   );
+      // }
+
+      // await getRepository(NFT).update(
+      //   { id: nft?.id },
+      //   {
+      //     imageRoute: hashedFileName,
+      //     isImageUploaded: true,
+      //   }
+      // );
+
+      // await processNFTs();
+      // console.log("NFT 처리 완료");
 
       // await handleBlockEvent(18552897);
       // console.log("완료");
