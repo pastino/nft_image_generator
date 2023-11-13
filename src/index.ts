@@ -78,8 +78,7 @@ async function processNFTs() {
     }
 
     // 각 NFT에 대해 처리합니다.
-    for (let i = 0; i < nfts.length; i++) {
-      const nft = nfts[i];
+    for (const nft of nfts) {
       // 여기에서 downloadImage 함수를 호출하고 결과에 따라 처리합니다.
       const { isSuccess, message, hashedFileName } = await downloadImage({
         imageUrl:
@@ -89,6 +88,19 @@ async function processNFTs() {
         contractAddress: nft.contract?.address,
         tokenId: nft.tokenId,
       });
+
+      console.log(
+        {
+          imageUrl:
+            typeof nft.imageRaw === "string"
+              ? nft.imageRaw.replace(/\x00/g, "")
+              : "",
+          contractAddress: nft.contract?.address,
+          tokenId: nft.tokenId,
+        },
+        hashedFileName
+      );
+
       if (!isSuccess) {
         await getRepository(NFT).update(
           { id: nft?.id },
