@@ -131,7 +131,7 @@ createConnection(connectionOptions)
         tokenId: nft.tokenId,
       });
 
-      console.log("message", message);
+      console.log("message1", message);
 
       // if (!isSuccess) {
       //   console.log("message", nft.id, message);
