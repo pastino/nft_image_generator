@@ -94,6 +94,7 @@ async function processNFTs() {
           { id: nft?.id },
           { isImageUploaded: false, imageSaveError: message }
         );
+        continue;
       }
 
       await getRepository(NFT).update(
@@ -101,6 +102,7 @@ async function processNFTs() {
         {
           imageRoute: hashedFileName,
           isImageUploaded: true,
+          imageSaveError: "",
         }
       );
       console.log(`${nft.id} 이미지 에러 처리완료`);
