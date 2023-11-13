@@ -78,8 +78,8 @@ async function processNFTs() {
     }
 
     // 각 NFT에 대해 처리합니다.
-    for (const nft of nfts) {
-      console.log("nft", nft);
+    for (let i = 0; i < nfts.length; i++) {
+      const nft = nfts[i];
       // 여기에서 downloadImage 함수를 호출하고 결과에 따라 처리합니다.
       const { isSuccess, message, hashedFileName } = await downloadImage({
         imageUrl:
