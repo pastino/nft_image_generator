@@ -114,7 +114,7 @@ createConnection(connectionOptions)
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
 
-      processNFTs().then(() => console.log("NFT 처리 완료"));
+      await processNFTs().then(() => console.log("NFT 처리 완료"));
 
       // await handleBlockEvent(18552897);
       // console.log("완료");
