@@ -100,7 +100,7 @@ async function processNFTs() {
           isImageUploaded: true,
         }
       );
-      console.log(`${nft} 이미지 에러 처리완료`);
+      console.log(`${nft.id} 이미지 에러 처리완료`);
     }
 
     // 다음 배치를 위해 오프셋을 업데이트합니다.
