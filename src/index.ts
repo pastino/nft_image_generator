@@ -72,6 +72,7 @@ async function processNFTs() {
 
     // 조회된 NFT가 없으면 처리를 중단합니다.
     if (nfts.length === 0) {
+      console.log("조회된 NFT가 없습니다.");
       break;
     }
 
@@ -114,7 +115,8 @@ createConnection(connectionOptions)
     app.listen(PORT, async () => {
       console.log(`Listening on port: "http://localhost:${PORT}"`);
 
-      await processNFTs().then(() => console.log("NFT 처리 완료"));
+      await processNFTs();
+      console.log("NFT 처리 완료");
 
       // await handleBlockEvent(18552897);
       // console.log("완료");
