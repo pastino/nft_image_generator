@@ -42,7 +42,6 @@ async function processNFTs() {
   let offset = 0; // 오프셋 초기화
 
   while (true) {
-    console.log("offset", offset);
     // 조건에 맞는 NFT를 조회합니다.
     const nfts = await getRepository(NFT)
       .createQueryBuilder("nft")
@@ -70,7 +69,7 @@ async function processNFTs() {
       .take(batchSize)
       .skip(offset)
       .getMany();
-    console.log(nfts.length);
+
     // 조회된 NFT가 없으면 처리를 중단합니다.
     if (nfts.length === 0) {
       console.log("조회된 NFT가 없습니다.");
@@ -102,12 +101,13 @@ async function processNFTs() {
       );
 
       if (!isSuccess) {
+        console.log("message", message);
         await getRepository(NFT).update(
           { id: nft?.id },
           { isImageUploaded: false, imageSaveError: message }
         );
-        return nft;
       }
+
       await getRepository(NFT).update(
         { id: nft?.id },
         {
