@@ -65,6 +65,8 @@ jobs:
           echo AWS_ACCESS_ID=${{ secrets.AWS_ACCESS_ID }} >> .env
           echo AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }} >> .env
           echo OPERATOR_ID=${{ secrets.OPERATOR_ID }} >> .env
+          echo ETH_NODE_HTTP=${{ secrets.ETH_NODE_HTTP }} >> .env
+          echo ETH_NODE_WS=${{ secrets.ETH_NODE_WS }} >> .env
           echo HOST=${{ secrets.HOST }} >> .env
           echo MYSQL_PORT=${{ secrets.MYSQL_PORT }} >> .env
           echo POSTGRESQL_PORT=${{ secrets.POSTGRESQL_PORT }} >> .env
@@ -86,6 +88,8 @@ jobs:
           AWS_ACCESS_ID: ${{ secrets.AWS_ACCESS_ID }}
           AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
           OPERATOR_ID: ${{ secrets.OPERATOR_ID }}
+          ETH_NODE_HTTP: ${{ secrets.ETH_NODE_HTTP }}
+          ETH_NODE_WS: ${{ secrets.ETH_NODE_WS }}
           HOST: ${{ secrets.HOST }}
           MYSQL_PORT: ${{ secrets.MYSQL_PORT }}
           USERNAME: ${{ secrets.USERNAME }}
