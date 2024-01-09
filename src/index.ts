@@ -268,6 +268,7 @@ if (cluster.isMaster) {
       if (msg) {
         try {
           const nftId = parseInt(msg.content.toString(), 10);
+          console.log("nftId", nftId);
 
           const nft = await getRepository(NFTEntity).findOne({
             where: {
@@ -276,6 +277,7 @@ if (cluster.isMaster) {
             relations: ["contract"],
           });
 
+          console.log("nft", nft);
           if (
             !nft ||
             nft?.imageRoute ||
