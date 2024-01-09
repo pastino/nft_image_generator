@@ -266,10 +266,8 @@ if (cluster.isMaster) {
 
     channel.consume(queueName, async (msg) => {
       if (msg) {
+        const nftId = parseInt(msg.content.toString(), 10);
         try {
-          const nftId = parseInt(msg.content.toString(), 10);
-          console.log("nftId", nftId);
-
           const nft = await getRepository(NFTEntity).findOne({
             where: {
               id: nftId,
@@ -277,7 +275,6 @@ if (cluster.isMaster) {
             relations: ["contract"],
           });
 
-          console.log("nft", nft);
           if (
             !nft ||
             nft?.imageRoute ||
@@ -330,12 +327,11 @@ if (cluster.isMaster) {
               isImageUploaded: true,
             }
           );
-
-          console.log(nft.id, "이미지 처리완료");
         } catch (e: any) {
           console.log(e);
           // 오류 로깅 또는 복구 로직을 여기에 추가
         } finally {
+          console.log(nftId, "이미지 처리완료");
           channel.ack(msg); // 성공이든 실패든 메시지를 큐에서 제거
           if (process.send) {
             process.send({ done: true });
