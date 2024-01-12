@@ -161,7 +161,7 @@ const app = express();
 app.use(express.json());
 
 let currentNFTId = 1135000;
-const numCPUs = 5;
+const numCPUs = 15;
 
 let connection: amqp.Connection;
 let channel: amqp.Channel;
@@ -331,7 +331,7 @@ if (cluster.isMaster) {
           console.log(e);
           // 오류 로깅 또는 복구 로직을 여기에 추가
         } finally {
-          console.log(nftId, "이미지 처리완료");
+          console.log(nftId, "큐 제거");
           channel.ack(msg); // 성공이든 실패든 메시지를 큐에서 제거
           if (process.send) {
             process.send({ done: true });
