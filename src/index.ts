@@ -161,7 +161,7 @@ const app = express();
 app.use(express.json());
 
 let currentNFTId = 1145971;
-const numCPUs = 150;
+const numCPUs = 100;
 
 let connection: amqp.Connection;
 let channel: amqp.Channel;
@@ -282,6 +282,11 @@ if (cluster.isMaster) {
             nft.isImageUploaded ||
             nft.imageSaveError
           ) {
+            console.log(
+              nft?.imageRoute,
+              nft?.isImageUploaded,
+              nft?.imageSaveError
+            );
             return;
           }
 
@@ -314,20 +319,20 @@ if (cluster.isMaster) {
             tokenId: nft.tokenId,
           });
 
-          if (!isSuccess) {
-            await getRepository(NFTEntity).update(
-              { id: nft?.id },
-              { isImageUploaded: false, imageSaveError: message }
-            );
-            return nft;
-          }
-          await getRepository(NFTEntity).update(
-            { id: nft?.id },
-            {
-              imageRoute: hashedFileName,
-              isImageUploaded: true,
-            }
-          );
+          // if (!isSuccess) {
+          //   await getRepository(NFTEntity).update(
+          //     { id: nft?.id },
+          //     { isImageUploaded: false, imageSaveError: message }
+          //   );
+          //   return nft;
+          // }
+          // await getRepository(NFTEntity).update(
+          //   { id: nft?.id },
+          //   {
+          //     imageRoute: hashedFileName,
+          //     isImageUploaded: true,
+          //   }
+          // );
         } catch (e: any) {
           console.log(e);
           // 오류 로깅 또는 복구 로직을 여기에 추가
