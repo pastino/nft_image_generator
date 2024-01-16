@@ -132,7 +132,6 @@ import "reflect-metadata";
 import express from "express";
 import { createConnection, getRepository } from "typeorm";
 import connectionOptions from "./shared/ormconfig";
-import { handleBlockEvent } from "./shared/blockEventHandler";
 import * as amqp from "amqplib";
 import cluster from "cluster";
 import { NFT as NFTEntity } from "./shared/entities/NFT";
@@ -160,7 +159,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 1206622;
+let currentNFTId = 1656622;
 const numCPUs = 30;
 
 let connection: amqp.Connection;
