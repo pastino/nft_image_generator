@@ -118,9 +118,6 @@
 //     console.log("DB CONNECTION!");
 //     app.listen(PORT, async () => {
 //       console.log(`Listening on port: "http://localhost:${PORT}"`);
-
-//       await processNFTs();
-//       console.log("NFT 처리 완료");
 //     });
 //   })
 //   .catch((error) => {
@@ -159,7 +156,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 1856622;
+let currentNFTId = 1;
 const numCPUs = 30;
 
 let connection: amqp.Connection;
@@ -288,7 +285,6 @@ if (cluster.isMaster) {
             );
             return;
           }
-
           if (!nft || !nft?.imageRaw) {
             let failedMessage = "";
             if (!nft) failedMessage = "nft가 없습니다.";
@@ -300,19 +296,10 @@ if (cluster.isMaster) {
             return;
           }
 
-          const nftData: any = await getNFTDetails(
-            nft.contract.address,
-            nft.tokenId
-          );
-
-          if (!nftData || typeof nftData.imageUri !== "string") {
-            return;
-          }
-
           const { isSuccess, message, hashedFileName } = await downloadImage({
             imageUrl:
-              typeof nftData?.imageUri === "string"
-                ? nftData.imageUri.replace(/\x00/g, "")
+              typeof nft?.imageRaw === "string"
+                ? nft?.imageRaw.replace(/\x00/g, "")
                 : "",
             contractAddress: nft.contract.address,
             tokenId: nft.tokenId,
