@@ -157,7 +157,7 @@ const app = express();
 app.use(express.json());
 
 let currentNFTId = 2430000;
-const numCPUs = 23;
+const numCPUs = 30;
 
 let connection: amqp.Connection;
 let channel: amqp.Channel;
