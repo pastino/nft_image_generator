@@ -132,7 +132,6 @@ import connectionOptions from "./shared/ormconfig";
 import * as amqp from "amqplib";
 import cluster from "cluster";
 import { NFT as NFTEntity } from "./shared/entities/NFT";
-import { getNFTDetails } from "./shared/utils";
 import { downloadImage } from "./shared/downloadNFTImage";
 
 const apiKeys = [
@@ -157,7 +156,7 @@ const app = express();
 app.use(express.json());
 
 let currentNFTId = 2921792;
-const numCPUs = 12;
+const numCPUs = 15;
 
 let connection: amqp.Connection;
 let channel: amqp.Channel;
