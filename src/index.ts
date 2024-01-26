@@ -133,6 +133,9 @@ import * as amqp from "amqplib";
 import cluster from "cluster";
 import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
+import { MetaData, fetchAndSetNFTDetails } from "./shared/utils";
+import { NFT } from "./shared/modules/nft";
+import { Contract } from "./shared/entities/Contract";
 
 const apiKeys = [
   process.env.ALCHEMY_API_KEY,
@@ -277,22 +280,47 @@ if (cluster.isMaster) {
             nft.isImageUploaded ||
             nft.imageSaveError
           ) {
-            console.log(
-              nft?.imageRoute,
-              nft?.isImageUploaded,
-              nft?.imageSaveError
-            );
             return;
           }
-          if (!nft || !nft?.imageRaw) {
-            let failedMessage = "";
-            if (!nft) failedMessage = "nft가 없습니다.";
-            if (!nft?.imageRaw) failedMessage = "이미지 url이 없습니다.";
-            await getRepository(NFTEntity).update(
-              { id: nft?.id },
-              { isImageUploaded: false, imageSaveError: failedMessage }
-            );
-            return;
+
+          if (nft?.attributesRaw && !nft?.imageRoute) {
+            try {
+              const metadata: MetaData = await fetchAndSetNFTDetails(
+                nft.attributesRaw
+              );
+
+              const title = metadata?.name ? String(metadata?.name) : "";
+              const description = metadata?.description || "";
+              const imageUri = metadata?.image || metadata?.animation_url;
+              const attribute = metadata?.attributes || [];
+
+              await getRepository(NFTEntity).update(
+                { id: nft?.id },
+                { imageRaw: imageUri, title, description }
+              );
+
+              const nftModule = new NFT({
+                contract: nft.contract,
+                tokenId: nft.tokenId,
+              });
+
+              if (!nft.isAttributeUpdated)
+                await nftModule.saveAttributes(nft, nft.contract, {
+                  title,
+                  description,
+                  imageUri,
+                  attribute,
+                });
+            } catch (e: any) {
+              await getRepository(NFTEntity).update(
+                { id: nft?.id },
+                {
+                  attributeNetworkError: e.message,
+                  isAttributeUpdated: false,
+                }
+              );
+              return;
+            }
           }
 
           const { isSuccess, message, hashedFileName } = await downloadImage({
