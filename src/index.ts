@@ -158,7 +158,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 0;
+let currentNFTId = 1;
 const numCPUs = 30;
 
 let connection: amqp.Connection;
@@ -278,11 +278,11 @@ if (cluster.isMaster) {
             !nft ||
             nft?.imageRoute ||
             nft.isImageUploaded ||
-            nft.imageSaveError
+            (nft.imageSaveError &&
+              nft.imageSaveError !== "이미지 url이 없습니다.")
           ) {
             return;
           }
-
           if (nft?.attributesRaw && !nft?.imageRoute) {
             try {
               const metadata: MetaData = await fetchAndSetNFTDetails(
