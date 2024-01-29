@@ -158,8 +158,8 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 1;
-const numCPUs = 30;
+let currentNFTId = 3988569;
+const numCPUs = 50;
 
 let connection: amqp.Connection;
 let channel: amqp.Channel;
@@ -283,6 +283,7 @@ if (cluster.isMaster) {
           ) {
             return;
           }
+
           if (nft?.attributesRaw && !nft?.imageRoute) {
             try {
               const metadata: MetaData = await fetchAndSetNFTDetails(
