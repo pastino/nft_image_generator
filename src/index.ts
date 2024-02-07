@@ -158,7 +158,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 4501688;
+let currentNFTId = 4783807;
 const numCPUs = 80;
 
 let connection: amqp.Connection;
