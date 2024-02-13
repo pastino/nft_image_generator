@@ -36,7 +36,7 @@
   "dependencies": {
     "@alch/alchemy-web3": "^1.4.7",
     "@types/amqplib": "^0.10.4",
-    "alchemy-sdk": "2.6.1",
+    "alchemy-sdk": "3.1.2",
     "amqplib": "^0.10.3",
     "axios": "^1.4.0",
     "bottleneck": "^2.19.5",

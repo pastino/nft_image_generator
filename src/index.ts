@@ -133,8 +133,7 @@ import * as amqp from "amqplib";
 import cluster from "cluster";
 import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
-import { MetaData, fetchAndSetNFTDetails } from "./shared/utils";
-import { NFT } from "./shared/modules/nft";
+
 import { Alchemy, Network } from "alchemy-sdk";
 
 const apiKeys = [
@@ -158,7 +157,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 1;
+let currentNFTId = 1000000;
 const numCPUs = 80;
 
 let connection: amqp.Connection;
