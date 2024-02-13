@@ -135,7 +135,7 @@ import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
 import { MetaData, fetchAndSetNFTDetails } from "./shared/utils";
 import { NFT } from "./shared/modules/nft";
-import { Contract } from "./shared/entities/Contract";
+import { Alchemy, Network } from "alchemy-sdk";
 
 const apiKeys = [
   process.env.ALCHEMY_API_KEY,
@@ -158,7 +158,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 4783807;
+let currentNFTId = 1;
 const numCPUs = 80;
 
 let connection: amqp.Connection;
@@ -256,7 +256,7 @@ if (cluster.isMaster) {
     connection = await amqp.connect("amqp://guest:guest@localhost");
     channel = await connection.createChannel();
 
-    const workerId = cluster.worker ? cluster.worker.id : null;
+    const workerId: any = cluster.worker ? cluster.worker.id : null;
 
     const queueName = `imageWorkerQueue_${workerId}`;
 
@@ -274,79 +274,65 @@ if (cluster.isMaster) {
             relations: ["contract"],
           });
 
-          if (
-            !nft ||
-            nft?.imageRoute ||
-            nft.isImageUploaded ||
-            (nft.imageSaveError &&
-              nft.imageSaveError !== "이미지 url이 없습니다.")
-          ) {
+          if (nft?.imageRoute) {
+            await getRepository(NFTEntity).update(
+              {
+                id: nftId,
+              },
+              {
+                processingStatus: 4,
+              }
+            );
             return;
           }
 
-          if (nft?.attributesRaw && !nft?.imageRoute) {
-            try {
-              const metadata: MetaData = await fetchAndSetNFTDetails(
-                nft.attributesRaw
-              );
+          if (!nft || (!nft?.imageRaw && !nft?.imageAlchemyUrl)) {
+            return;
+          }
 
-              const title = metadata?.name ? String(metadata?.name) : "";
-              const description = metadata?.description || "";
-              const imageUri = metadata?.image || metadata?.animation_url;
-              const attribute = metadata?.attributes || [];
+          if (
+            nft?.processingStatus > 1 &&
+            (nft?.imageRaw || nft?.imageAlchemyUrl)
+          ) {
+            const imageUrl = nft?.imageRaw
+              ? nft?.imageRaw.replace(/\x00/g, "")
+              : nft?.imageAlchemyUrl;
 
+            const config = {
+              apiKey: workerApiKeys[workerId] || process.env.ALCHEMY_API_KEY,
+              network: Network.ETH_MAINNET,
+            };
+
+            const alchemy = new Alchemy(config);
+
+            const { isSuccess, message, hashedFileName } = await downloadImage({
+              imageUrl,
+              contractAddress: nft.contract.address,
+              tokenId: nft.tokenId,
+              alchemy,
+            });
+
+            if (isSuccess) {
               await getRepository(NFTEntity).update(
-                { id: nft?.id },
-                { imageRaw: imageUri, title, description }
-              );
-
-              const nftModule = new NFT({
-                contract: nft.contract,
-                tokenId: nft.tokenId,
-              });
-
-              if (!nft.isAttributeUpdated)
-                await nftModule.saveAttributes(nft, nft.contract, {
-                  title,
-                  description,
-                  imageUri,
-                  attribute,
-                });
-            } catch (e: any) {
-              await getRepository(NFTEntity).update(
-                { id: nft?.id },
                 {
-                  attributeNetworkError: e.message,
-                  isAttributeUpdated: false,
+                  id: nftId,
+                },
+                {
+                  imageRoute: hashedFileName,
+                  processingStatus: 4,
                 }
               );
-              return;
+            } else {
+              await getRepository(NFTEntity).update(
+                {
+                  id: nftId,
+                },
+                {
+                  errorMessage: message,
+                }
+              );
             }
           }
-
-          const { isSuccess, message, hashedFileName } = await downloadImage({
-            imageUrl:
-              typeof nft?.imageRaw === "string"
-                ? nft?.imageRaw.replace(/\x00/g, "")
-                : "",
-            contractAddress: nft.contract.address,
-            tokenId: nft.tokenId,
-          });
-
-          if (!isSuccess) {
-            await getRepository(NFTEntity).update(
-              { id: nft?.id },
-              { isImageUploaded: false, imageSaveError: message }
-            );
-            return nft;
-          }
-          await getRepository(NFTEntity).update(
-            { id: nft?.id },
-            {
-              imageRoute: hashedFileName,
-              isImageUploaded: true,
-            }
-          );
         } catch (e: any) {
           console.log(e);
           // 오류 로깅 또는 복구 로직을 여기에 추가
