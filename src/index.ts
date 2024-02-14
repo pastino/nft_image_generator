@@ -135,6 +135,8 @@ import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
 
 import { Alchemy, Network } from "alchemy-sdk";
+import { getNFTDetails } from "./shared/utils";
+import { NFT } from "./shared/modules/nft";
 
 const apiKeys = [
   process.env.ALCHEMY_API_KEY,
@@ -272,8 +274,72 @@ if (cluster.isMaster) {
             },
             relations: ["contract"],
           });
+          const config = {
+            apiKey: workerApiKeys[workerId] || process.env.ALCHEMY_API_KEY,
+            network: Network.ETH_MAINNET,
+          };
+
+          const alchemy = new Alchemy(config);
 
           if (nft?.imageRoute) {
+            if (!nft?.isUpdatedComplete) {
+              const { isSuccess, nftDetail, message } = await getNFTDetails(
+                nft.contract.address,
+                nft.tokenId,
+                alchemy
+              );
+
+              const updateData: any = {};
+              if (nftDetail?.title) updateData.title = nftDetail?.title;
+              if (nftDetail?.description)
+                updateData.description = nftDetail?.description;
+              if (nftDetail?.imageUri)
+                updateData.imageRaw = nftDetail?.imageUri;
+              if (nftDetail?.attributesRaw)
+                updateData.attributesRaw = nftDetail?.attributesRaw;
+              if (nftDetail?.imageAlchemyUrl)
+                updateData.imageAlchemyUrl = nftDetail?.imageAlchemyUrl;
+              if (nftDetail?.tokenType)
+                updateData.tokenType = nftDetail?.tokenType;
+              if (nftDetail?.processingStatus)
+                updateData.processingStatus = nftDetail?.processingStatus;
+
+              if (isSuccess) {
+                await getRepository(NFTEntity).update(
+                  { id: nft?.id },
+                  updateData
+                );
+
+                const nftModule = new NFT({
+                  contract: nft.contract,
+                  tokenId: nft.tokenId,
+                  alchemy,
+                });
+
+                await nftModule.saveAttributes(
+                  nft,
+                  nft.contract,
+                  nftDetail?.attribute
+                );
+
+                await getRepository(NFTEntity).update(
+                  { id: nft?.id },
+                  {
+                    isUpdatedComplete: true,
+                    errorMessage: "",
+                  }
+                );
+              } else {
+                await getRepository(NFTEntity).update(
+                  { id: nft?.id },
+                  {
+                    ...updateData,
+                    errorMessage: message,
+                    processingStatus: 1,
+                  }
+                );
+              }
+            }
             await getRepository(NFTEntity).update(
               {
                 id: nftId,
@@ -296,13 +362,6 @@ if (cluster.isMaster) {
             const imageUrl = nft?.imageRaw
               ? nft?.imageRaw.replace(/\x00/g, "")
               : nft?.imageAlchemyUrl;
-
-            const config = {
-              apiKey: workerApiKeys[workerId] || process.env.ALCHEMY_API_KEY,
-              network: Network.ETH_MAINNET,
-            };
-
-            const alchemy = new Alchemy(config);
 
             const { isSuccess, message, hashedFileName } = await downloadImage({
               imageUrl,
