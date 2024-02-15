@@ -159,7 +159,6 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-// 1796338
 let currentNFTId = 1793332;
 const numCPUs = 80;
 
