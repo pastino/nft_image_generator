@@ -135,7 +135,7 @@ import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
 
 import { Alchemy, Network } from "alchemy-sdk";
-import { getNFTDetails } from "./shared/utils";
+import { getNFTDetails, sanitizeText, truncateTitle } from "./shared/utils";
 import { NFT } from "./shared/modules/nft";
 
 const apiKeys = [
@@ -290,13 +290,18 @@ if (cluster.isMaster) {
               );
 
               const updateData: any = {};
-              if (nftDetail?.title) updateData.title = nftDetail?.title;
+              if (nftDetail?.title)
+                updateData.title = truncateTitle(
+                  sanitizeText(nftDetail?.title)
+                );
               if (nftDetail?.description)
-                updateData.description = nftDetail?.description;
+                updateData.description = sanitizeText(nftDetail?.description);
               if (nftDetail?.imageUri)
-                updateData.imageRaw = nftDetail?.imageUri;
+                updateData.imageRaw = sanitizeText(nftDetail?.imageUri);
               if (nftDetail?.attributesRaw)
-                updateData.attributesRaw = nftDetail?.attributesRaw;
+                updateData.attributesRaw = sanitizeText(
+                  nftDetail?.attributesRaw
+                );
               if (nftDetail?.imageAlchemyUrl)
                 updateData.imageAlchemyUrl = nftDetail?.imageAlchemyUrl;
               if (nftDetail?.tokenType)
