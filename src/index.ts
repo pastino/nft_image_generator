@@ -159,7 +159,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 4947869;
+let currentNFTId = 5500000;
 const numCPUs = 50;
 
 let connection: amqp.Connection;
@@ -294,8 +294,9 @@ if (cluster.isMaster) {
                 updateData.title = truncateTitle(
                   sanitizeText(nftDetail?.title)
                 );
-              if (nftDetail?.description)
-                updateData.description = sanitizeText(nftDetail?.description);
+              if (nftDetail && "description" in nftDetail) {
+                updateData.description = sanitizeText(nftDetail.description);
+              }
               if (nftDetail?.imageUri)
                 updateData.imageRaw = sanitizeText(nftDetail?.imageUri);
               if (nftDetail?.attributesRaw)
