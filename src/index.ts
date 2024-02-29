@@ -127,12 +127,13 @@
 import "./env";
 import "reflect-metadata";
 import express from "express";
-import { createConnection, getRepository, Connection } from "typeorm";
+import { createConnection, getRepository } from "typeorm";
 import connectionOptions from "./shared/ormconfig";
 import * as amqp from "amqplib";
 import cluster from "cluster";
 import { NFT as NFTEntity } from "./shared/entities/NFT";
 import { downloadImage } from "./shared/downloadNFTImage";
+
 import { Alchemy, Network } from "alchemy-sdk";
 import { getNFTDetails, sanitizeText, truncateTitle } from "./shared/utils";
 import { NFT } from "./shared/modules/nft";
@@ -150,26 +151,19 @@ interface WorkerApiKeys {
   [workerId: number]: string;
 }
 
+// 워커 ID와 API 키를 매핑
 const workerApiKeys: WorkerApiKeys = {};
+
 export const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 5952964;
-const numCPUs = 60;
+let currentNFTId = 5954388;
+const numCPUs = 40;
+
 let connection: amqp.Connection;
 let channel: amqp.Channel;
-
-// 리소스 정리를 위한 함수
-async function cleanupResources() {
-  if (channel) {
-    await channel.close();
-  }
-  if (connection) {
-    await connection.close();
-  }
-}
 
 const sendNextBlockNumber = async (workerId: number) => {
   const queueName = `imageWorkerQueue_${workerId}`;
@@ -185,25 +179,30 @@ const assertQueue = async (queueName: string) => {
 const setupWorkerQueues = async () => {
   for (let i = 0; i < numCPUs; i++) {
     const queueName = `imageWorkerQueue_${i}`;
+
+    // 기존 큐 삭제
     try {
       await channel.deleteQueue(queueName);
       console.log(`Queue ${queueName} deleted`);
     } catch (error: any) {
       console.error(`Error deleting queue ${queueName}:`, error.message);
     }
+
+    // 큐 생성
     await assertQueue(queueName);
   }
 };
 
 if (cluster.isMaster) {
   createConnection(connectionOptions)
-    .then(async (dbConnection: Connection) => {
+    .then(async () => {
       console.log("DB CONNECTION!");
       app.listen(PORT, async () => {
         console.log(`Listening on port: "http://localhost:${PORT}"`);
       });
 
       connection = await amqp.connect("amqp://guest:guest@localhost");
+
       channel = await connection.createChannel();
 
       await setupWorkerQueues();
@@ -212,21 +211,26 @@ if (cluster.isMaster) {
         sendNextBlockNumber(i);
       }
 
-      // 종료 시 리소스 정리
-      process.on("SIGINT", async () => {
-        await dbConnection.close();
-        await cleanupResources();
-        process.exit();
-      });
-
       cluster.on("exit", (worker, code, signal) => {
         console.log(`Worker ${worker.id} died. Restarting...`);
+        // 새로운 워커 생성하고 API 키 재할당
         const newWorker = cluster.fork({
           ALCHEMY_API_KEY: workerApiKeys[worker.id],
         });
+        // 새 워커에 대한 API 키 업데이트
         workerApiKeys[newWorker.id] = workerApiKeys[worker.id];
+        // 기존 워커 삭제
         delete workerApiKeys[worker.id];
+
+        // 새로운 워커에게 다음 블록 번호 전송
         sendNextBlockNumber(newWorker.id);
+      });
+
+      cluster.on("message", (worker, message, handle) => {
+        if (message && message.done) {
+          const workerId = worker.id;
+          sendNextBlockNumber(workerId);
+        }
       });
     })
     .catch((error) => {
@@ -238,6 +242,8 @@ if (cluster.isMaster) {
       const worker = cluster.fork({
         ALCHEMY_API_KEY: apiKeys[i % apiKeys.length],
       });
+
+      // 워커 ID와 API 키를 매핑
       workerApiKeys[worker.id] = apiKeys[i % apiKeys.length] as string;
     }
   };
@@ -245,14 +251,16 @@ if (cluster.isMaster) {
   startInitial();
 } else {
   (async () => {
-    const dbConnection = await createConnection(connectionOptions);
+    await createConnection(connectionOptions);
     console.log("DB CONNECTION IN WORKER!");
 
     connection = await amqp.connect("amqp://guest:guest@localhost");
     channel = await connection.createChannel();
 
     const workerId: any = cluster.worker ? cluster.worker.id : null;
+
     const queueName = `imageWorkerQueue_${workerId}`;
+
     await assertQueue(queueName);
 
     channel.consume(queueName, async (msg) => {
@@ -401,12 +409,6 @@ if (cluster.isMaster) {
           }
         }
       }
-    });
-
-    // 워커 종료 시 리소스 정리
-    process.on("SIGINT", async () => {
-      await dbConnection.close();
-      await cleanupResources();
     });
   })().catch(console.error);
 }
