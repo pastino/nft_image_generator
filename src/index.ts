@@ -159,7 +159,7 @@ const PORT = IS_PRODUCTION ? process.env.PORT : 9001;
 const app = express();
 app.use(express.json());
 
-let currentNFTId = 6000809;
+let currentNFTId = 6432573;
 const numCPUs = 40;
 
 let connection: amqp.Connection;
@@ -369,31 +369,42 @@ if (cluster.isMaster) {
               ? nft?.imageRaw.replace(/\x00/g, "")
               : nft?.imageAlchemyUrl;
 
-            const { isSuccess, message, hashedFileName } = await downloadImage({
-              imageUrl,
-              contractAddress: nft.contract.address,
-              tokenId: nft.tokenId,
-              alchemy,
-            });
+            try {
+              const { isSuccess, message, hashedFileName } =
+                await downloadImage({
+                  imageUrl,
+                  contractAddress: nft.contract.address,
+                  tokenId: nft.tokenId,
+                });
 
-            if (isSuccess) {
+              if (isSuccess) {
+                await getRepository(NFTEntity).update(
+                  {
+                    id: nftId,
+                  },
+                  {
+                    imageRoute: hashedFileName,
+                    processingStatus: 4,
+                    errorMessageForImage: "",
+                  }
+                );
+              } else {
+                await getRepository(NFTEntity).update(
+                  {
+                    id: nftId,
+                  },
+                  {
+                    errorMessageForImage: message,
+                  }
+                );
+              }
+            } catch (e: any) {
               await getRepository(NFTEntity).update(
                 {
                   id: nftId,
                 },
                 {
-                  imageRoute: hashedFileName,
-                  processingStatus: 4,
-                  errorMessage: "",
-                }
-              );
-            } else {
-              await getRepository(NFTEntity).update(
-                {
-                  id: nftId,
-                },
-                {
-                  errorMessage: message,
+                  errorMessageForImage: e.message,
                 }
               );
             }
