@@ -358,6 +358,14 @@ if (cluster.isMaster) {
           }
 
           if (!nft || (!nft?.imageRaw && !nft?.imageAlchemyUrl)) {
+            await getRepository(NFTEntity).update(
+              {
+                id: nftId,
+              },
+              {
+                errorMessageForImage: "no image url",
+              }
+            );
             return;
           }
 
